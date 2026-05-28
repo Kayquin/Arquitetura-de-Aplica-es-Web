@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/AgendaConsultas.Api/AgendaConsultas.Api.csproj" />
+    <Project Path="backend/AgendaConsultas.Tests/AgendaConsultas.Tests.csproj" />
+  </Folder>
+</Solution>
