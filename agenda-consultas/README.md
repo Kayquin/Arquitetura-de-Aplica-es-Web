@@ -1,6 +1,15 @@
 # Agenda de Consultas
 
-Aplicacao web simples para agenda de consultas medicas. O dominio usa duas entidades relacionadas: Pacientes e Consultas. A API oferece CRUD completo, documentacao Swagger e autenticacao JWT com perfis admin/usuario.
+Aplicacao web para agenda de consultas medicas. O dominio usa duas entidades relacionadas (Pacientes e Consultas). A API oferece CRUD completo, Swagger e autenticacao JWT com perfis admin/usuario.
+
+## Funcionalidades
+
+- CRUD de pacientes
+- CRUD de consultas
+- Registro e login com JWT
+- Perfis admin e usuario
+- Swagger para documentacao
+- Frontend simples com navegacao assincrona
 
 ## Stack
 
@@ -8,25 +17,34 @@ Aplicacao web simples para agenda de consultas medicas. O dominio usa duas entid
 - Banco: MongoDB
 - Frontend: HTML + JavaScript (fetch)
 
+## Estrutura
+
+- backend/AgendaConsultas.Api -> API
+- backend/AgendaConsultas.Tests -> testes unitarios
+- frontend -> pagina web
+- docker-compose.yml -> MongoDB local
+
 ## Requisitos
 
 - .NET SDK 10.0
-- Docker (para MongoDB)
+- Docker Desktop (para MongoDB)
 
-## Variaveis de ambiente
+## Variaveis de ambiente (opcional)
 
-Exemplos (PowerShell):
+Se quiser sobrescrever valores locais, use:
 
 ```
 $env:Mongo__ConnectionString="mongodb://localhost:27017"
 $env:Mongo__DatabaseName="AgendaConsultasDb"
-$env:Jwt__Key="CHANGE_ME_USE_ENV_VAR"
+$env:Jwt__Key="super-secret-key-32-chars-minimum!!"
 $env:Jwt__Issuer="AgendaConsultas.Api"
 $env:Jwt__Audience="AgendaConsultas.Api"
 $env:Jwt__ExpirationMinutes="60"
 ```
 
-## Como executar
+Observacao: a chave JWT precisa ter 32+ caracteres.
+
+## Passo a passo
 
 1) Suba o MongoDB:
 
@@ -45,26 +63,89 @@ dotnet run --project backend/AgendaConsultas.Api
 - Swagger: http://localhost:5000/swagger
 - Frontend: http://localhost:5000/
 
+## Fluxo rapido (Postman)
+
+Base URL:
+
+```
+http://localhost:5000
+```
+
+1) Registrar admin
+
+POST /api/auth/register
+
+```
+{
+	"email": "admin@email.com",
+	"password": "123456",
+	"role": "admin"
+}
+```
+
+2) Login
+
+POST /api/auth/login
+
+```
+{
+	"email": "admin@email.com",
+	"password": "123456"
+}
+```
+
+Guarde o token e use no header:
+
+```
+Authorization: Bearer <TOKEN>
+```
+
+3) Criar paciente
+
+POST /api/pacientes
+
+```
+{
+	"nome": "Ana Silva",
+	"cpf": "12345678901",
+	"telefone": "11999999999",
+	"email": "ana@email.com"
+}
+```
+
+4) Criar consulta
+
+POST /api/consultas
+
+```
+{
+	"pacienteId": "<ID_PACIENTE>",
+	"data": "2026-05-28T14:00:00Z",
+	"especialidade": "clinico",
+	"status": "agendada"
+}
+```
+
 ## Endpoints principais
 
 - /api/pacientes (CRUD completo)
 - /api/consultas (CRUD completo)
 - /api/auth/register
 - /api/auth/login
+- /api/auth/role (admin)
+- /api/usuarios (admin)
 
-## Postman (exemplos de requests)
+## Regras de acesso
 
-Defina a base URL como:
+- Update e delete exigem role admin.
+- Depois de atualizar role, o usuario deve fazer login novamente.
 
-```
-http://localhost:5000
-```
+## Postman (lista completa)
 
 ### Auth - Register
 
 - Metodo: POST
 - URL: /api/auth/register
-- Body (raw JSON):
 
 ```
 {
@@ -78,7 +159,6 @@ http://localhost:5000
 
 - Metodo: POST
 - URL: /api/auth/login
-- Body (raw JSON):
 
 ```
 {
@@ -87,17 +167,10 @@ http://localhost:5000
 }
 ```
 
-Copie o token e use no header:
-
-```
-Authorization: Bearer <TOKEN>
-```
-
 ### Pacientes - Criar
 
 - Metodo: POST
 - URL: /api/pacientes
-- Body (raw JSON):
 
 ```
 {
@@ -118,7 +191,6 @@ Authorization: Bearer <TOKEN>
 - Metodo: PUT
 - URL: /api/pacientes/{id}
 - Header: Authorization: Bearer <TOKEN>
-- Body (raw JSON):
 
 ```
 {
@@ -139,7 +211,6 @@ Authorization: Bearer <TOKEN>
 
 - Metodo: POST
 - URL: /api/consultas
-- Body (raw JSON):
 
 ```
 {
@@ -160,7 +231,6 @@ Authorization: Bearer <TOKEN>
 - Metodo: PUT
 - URL: /api/consultas/{id}
 - Header: Authorization: Bearer <TOKEN>
-- Body (raw JSON):
 
 ```
 {
@@ -182,7 +252,6 @@ Authorization: Bearer <TOKEN>
 - Metodo: PUT
 - URL: /api/auth/role
 - Header: Authorization: Bearer <TOKEN>
-- Body (raw JSON):
 
 ```
 {
@@ -203,13 +272,18 @@ Authorization: Bearer <TOKEN>
 - URL: /api/usuarios/{id}
 - Header: Authorization: Bearer <TOKEN>
 
-## Regras de acesso
-
-- Update e delete exigem role admin.
-- O role pode ser definido no registro (usuario ou admin).
-
 ## Testes
 
 ```
 dotnet test AgendaConsultas.slnx
 ```
+
+Detalhes dos testes:
+
+- backend/AgendaConsultas.Tests/README.md
+
+## Problemas comuns
+
+- 415: verifique Content-Type = application/json no Postman.
+- 401: token ausente ou gerado antes de trocar a chave JWT.
+- 400: valide CPF (11 digitos) e email valido.
