@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agenda de Consultas</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="backdrop"></div>
+
+  <header class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow">Agenda de Consultas</span>
+      <h1>Central de atendimentos para clinicas pequenas.</h1>
+      <p>Cadastre pacientes, organize consultas e visualize tudo em um painel claro e rapido.</p>
+      <div class="hero-note">
+        <span>API + MongoDB + JWT</span>
+        <span>CRUD completo</span>
+      </div>
+    </div>
+    <div class="hero-card">
+      <h2>Conexao da API</h2>
+      <div class="api-config">
+        <label for="apiBase">API base</label>
+        <input id="apiBase" type="text" value="http://localhost:5000" />
+        <button id="saveApiBase">Salvar</button>
+      </div>
+      <p class="hint">Se mudar a porta da API, atualize aqui.</p>
+    </div>
+  </header>
+
+  <section class="panel auth-panel">
+    <div class="panel-header">
+      <h2>Autenticacao</h2>
+      <p>Crie contas e gerencie tokens de acesso.</p>
+    </div>
+    <div class="auth-grid">
+      <form id="registerForm" class="card">
+        <h3>Registrar</h3>
+        <input id="regEmail" type="email" placeholder="Email" required />
+        <input id="regPassword" type="password" placeholder="Senha" minlength="6" required />
+        <select id="regRole">
+          <option value="usuario">usuario</option>
+          <option value="admin">admin</option>
+        </select>
+        <button type="submit">Criar conta</button>
+      </form>
+      <form id="loginForm" class="card">
+        <h3>Login</h3>
+        <input id="loginEmail" type="email" placeholder="Email" required />
+        <input id="loginPassword" type="password" placeholder="Senha" required />
+        <button type="submit">Entrar</button>
+      </form>
+      <div class="card token-box">
+        <h3>Status</h3>
+        <p id="authStatus">Sem login</p>
+        <button id="logout" type="button">Sair</button>
+      </div>
+    </div>
+  </section>
+
+  <nav class="nav">
+    <button data-view="pacientes" class="active">Pacientes</button>
+    <button data-view="consultas" id="navConsultas" disabled>Consultas</button>
+  </nav>
+
+  <main class="content">
+    <section id="view-pacientes" class="view active">
+      <div class="content-grid">
+        <div class="list-panel">
+          <div class="panel-header">
+            <h2>Pacientes</h2>
+            <p>Selecione para ver consultas.</p>
+          </div>
+          <ul id="pacienteList" class="list"></ul>
+        </div>
+        <form id="pacienteForm" class="card form-panel">
+          <h3>Novo paciente</h3>
+          <input id="pacienteNome" type="text" placeholder="Nome completo" required />
+          <input id="pacienteCpf" type="text" placeholder="CPF" required />
+          <input id="pacienteTelefone" type="text" placeholder="Telefone" required />
+          <input id="pacienteEmail" type="email" placeholder="Email" required />
+          <button type="submit">Salvar</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-consultas" class="view">
+      <div class="content-grid">
+        <div class="list-panel">
+          <div class="panel-header">
+            <h2>Consultas</h2>
+            <p id="pacienteSelecionado">Selecione um paciente</p>
+          </div>
+          <ul id="consultaList" class="list"></ul>
+        </div>
+        <form id="consultaForm" class="card form-panel">
+          <h3>Nova consulta</h3>
+          <input id="consultaData" type="datetime-local" required />
+          <input id="consultaEspecialidade" type="text" placeholder="Especialidade" required />
+          <select id="consultaStatus">
+            <option value="agendada">agendada</option>
+            <option value="concluida">concluida</option>
+            <option value="cancelada">cancelada</option>
+          </select>
+          <button type="submit">Salvar</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span id="statusMessage"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
