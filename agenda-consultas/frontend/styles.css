@@ -101,6 +101,16 @@ body {
   font-size: 20px;
 }
 
+.hero-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  color: rgba(248, 250, 252, 0.78);
+}
+
 .hint {
   font-size: 13px;
   color: rgba(248, 250, 252, 0.7);
@@ -117,6 +127,10 @@ body {
   letter-spacing: 1px;
   text-transform: uppercase;
   color: rgba(248, 250, 252, 0.7);
+}
+
+.card .api-config label {
+  color: var(--muted);
 }
 
 .panel {
@@ -191,6 +205,11 @@ button:hover {
   border: 1px solid rgba(16, 24, 40, 0.2);
 }
 
+.nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .nav button.active {
   background: var(--surface);
   color: #f8fafc;
@@ -247,12 +266,32 @@ button:hover {
   background: var(--teal);
 }
 
+.list button.danger,
+button.danger {
+  background: #d94848;
+}
+
+.list button.danger:hover,
+button.danger:hover {
+  box-shadow: 0 12px 20px rgba(217, 72, 72, 0.25);
+}
+
 .view {
   display: none;
 }
 
 .view.active {
   display: block;
+}
+
+.hint-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .footer {
