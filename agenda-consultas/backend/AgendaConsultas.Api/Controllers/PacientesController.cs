@@ -8,6 +8,7 @@ namespace AgendaConsultas.Api.Controllers;
 
 [ApiController]
 [Route("api/pacientes")]
+[Authorize]
 public class PacientesController : ControllerBase
 {
     private readonly IPacienteService _service;

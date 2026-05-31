@@ -12,10 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
+// Carrega configuracoes de MongoDB e JWT.
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("Mongo"));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<MongoDbContext>();
 
+// Registra repositorios e servicos no DI.
 builder.Services.AddScoped<IPacienteRepository, PacienteRepository>();
 builder.Services.AddScoped<IConsultaRepository, ConsultaRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
@@ -26,12 +28,14 @@ builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
+// Permite chamadas do frontend local.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
         policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
+// Validacao JWT para endpoints protegidos.
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
 var jwtKey = Encoding.UTF8.GetBytes(jwtSettings.Key ?? string.Empty);
 
@@ -55,6 +59,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 builder.Services.AddEndpointsApiExplorer();
+// Swagger usa comentarios XML quando disponiveis.
 builder.Services.AddSwaggerGen(options =>
 {
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -72,6 +77,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Serve o frontend de /frontend quando existir.
 var frontendPath = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "frontend"));
 if (Directory.Exists(frontendPath))
 {
@@ -87,6 +93,7 @@ if (Directory.Exists(frontendPath))
 
 app.UseHttpsRedirection();
 
+// Pipeline de auth: JWT depois autorizacao.
 app.UseAuthentication();
 app.UseAuthorization();
 

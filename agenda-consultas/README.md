@@ -139,6 +139,10 @@ POST /api/consultas
 
 - Update e delete exigem role admin.
 - Depois de atualizar role, o usuario deve fazer login novamente.
+- Usuarios nao admin so veem consultas do paciente com o mesmo email do login.
+- Consultas so podem ser marcadas em horarios padronizados.
+- Use /api/consultas/slots?date=yyyy-MM-dd para ver horarios disponiveis.
+- O endpoint de slots pode ser acessado sem login.
 
 ## Postman (lista completa)
 

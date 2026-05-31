@@ -29,6 +29,7 @@ public class PacienteService : IPacienteService
 
     public async Task<Paciente> CreateAsync(PacienteCreateDto dto)
     {
+        // Valida e garante email/cpf unicos.
         ValidatePaciente(dto.Nome, dto.Cpf, dto.Telefone, dto.Email);
 
         if (await _repository.EmailExistsAsync(dto.Email))
@@ -56,6 +57,7 @@ public class PacienteService : IPacienteService
 
     public async Task UpdateAsync(string id, PacienteUpdateDto dto)
     {
+        // Rejeita update para id inexistente.
         ValidatePaciente(dto.Nome, dto.Cpf, dto.Telefone, dto.Email);
 
         var existing = await _repository.GetByIdAsync(id);

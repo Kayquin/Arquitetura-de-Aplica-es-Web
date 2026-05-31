@@ -8,11 +8,21 @@ PacienteService
 
 - cria paciente com dados validos
 - falha ao criar paciente com email invalido
+- falha ao criar paciente com email duplicado
+- falha ao criar paciente com CPF duplicado
+- falha ao atualizar paciente inexistente
+- falha ao remover paciente inexistente
+- atualiza dados do paciente
 
 ConsultaService
 
 - cria consulta para paciente existente
 - falha ao criar consulta quando o paciente nao existe
+- falha ao criar consulta fora do horario padrao
+- falha ao criar consulta quando o horario ja esta ocupado
+- permite criar consulta quando a anterior esta cancelada
+- preenche campo dataBrasil (horario do Brasil)
+- marca horarios ocupados no endpoint de slots
 
 ## Como funciona
 
@@ -24,6 +34,11 @@ ConsultaService
 Arquivo principal:
 
 - UnitTest1.cs: testes e repositorios em memoria.
+
+## Observacoes
+
+- Horarios padronizados usam o fuso do Brasil e sao validados no service.
+- O banco armazena data em UTC, mas a API gera dataBrasil com offset -03:00.
 
 ## Como executar
 

@@ -17,6 +17,7 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RegisterAsync(AuthRegisterDto dto)
     {
+        // Validacao basica do cadastro.
         if (string.IsNullOrWhiteSpace(dto.Email) || !dto.Email.Contains('@'))
         {
             throw new ArgumentException("Email is invalid");
@@ -33,12 +34,14 @@ public class AuthService : IAuthService
             throw new ArgumentException("Email already registered");
         }
 
+        // Restringe roles permitidos.
         var role = string.IsNullOrWhiteSpace(dto.Role) ? "usuario" : dto.Role.Trim().ToLowerInvariant();
         if (role != "admin" && role != "usuario")
         {
             throw new ArgumentException("Role is invalid");
         }
 
+        // Hash da senha antes de salvar.
         var usuario = new Usuario
         {
             Email = dto.Email.Trim(),
@@ -58,6 +61,7 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> LoginAsync(AuthLoginDto dto)
     {
+        // Valida credenciais e emite token.
         var usuario = await _usuarioRepository.GetByEmailAsync(dto.Email.Trim());
         if (usuario is null || !BCrypt.Net.BCrypt.Verify(dto.Password, usuario.PasswordHash))
         {
@@ -74,6 +78,7 @@ public class AuthService : IAuthService
 
     public async Task<AuthRoleUpdateResponseDto> UpdateRoleAsync(AuthRoleUpdateDto dto)
     {
+        // Fluxo de alteracao de role (admin).
         if (string.IsNullOrWhiteSpace(dto.Email) || !dto.Email.Contains('@'))
         {
             throw new ArgumentException("Email is invalid");

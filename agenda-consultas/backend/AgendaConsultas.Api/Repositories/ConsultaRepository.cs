@@ -25,6 +25,9 @@ public class ConsultaRepository : IConsultaRepository
     public Task<List<Consulta>> GetByPacienteIdAsync(string pacienteId) =>
         _collection.Find(c => c.PacienteId == pacienteId).ToListAsync();
 
+    public Task<List<Consulta>> GetByDateRangeAsync(DateTime start, DateTime end) =>
+        _collection.Find(c => c.Data >= start && c.Data < end).ToListAsync();
+
     public Task CreateAsync(Consulta consulta) =>
         _collection.InsertOneAsync(consulta);
 
@@ -40,4 +43,18 @@ public class ConsultaRepository : IConsultaRepository
 
     public async Task<bool> ExistsAsync(string id) =>
         ObjectId.TryParse(id, out _) && await _collection.Find(c => c.Id == id).AnyAsync();
+
+    public async Task<bool> ExistsAtAsync(DateTime data, string? ignoreId = null)
+    {
+        if (!string.IsNullOrWhiteSpace(ignoreId))
+        {
+            return await _collection
+                .Find(c => c.Data == data && c.Status != "cancelada" && c.Id != ignoreId)
+                .AnyAsync();
+        }
+
+        return await _collection
+            .Find(c => c.Data == data && c.Status != "cancelada")
+            .AnyAsync();
+    }
 }

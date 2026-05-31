@@ -22,6 +22,9 @@ public class PacienteRepository : IPacienteRepository
             await _collection.Find(p => p.Id == id).FirstOrDefaultAsync() :
             null;
 
+    public async Task<Paciente?> GetByEmailAsync(string email) =>
+        await _collection.Find(p => p.Email == email).FirstOrDefaultAsync();
+
     public Task CreateAsync(Paciente paciente) =>
         _collection.InsertOneAsync(paciente);
 

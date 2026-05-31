@@ -16,6 +16,9 @@ public class Consulta
     [BsonElement("data")]
     public DateTime Data { get; set; }
 
+    [BsonElement("dataBrasil")]
+    public string? DataBrasil { get; set; }
+
     [BsonElement("especialidade")]
     public string Especialidade { get; set; } = string.Empty;
 

@@ -6,6 +6,7 @@ public interface IPacienteRepository
 {
     Task<List<Paciente>> GetAllAsync();
     Task<Paciente?> GetByIdAsync(string id);
+    Task<Paciente?> GetByEmailAsync(string email);
     Task CreateAsync(Paciente paciente);
     Task UpdateAsync(string id, Paciente paciente);
     Task DeleteAsync(string id);

@@ -19,6 +19,7 @@ public class TokenService : ITokenService
 
     public string CreateToken(Usuario usuario)
     {
+        // Cria JWT com claims de email e role.
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Key));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -29,6 +30,7 @@ public class TokenService : ITokenService
             new(ClaimTypes.Role, usuario.Role)
         };
 
+        // Expiracao vem das configuracoes.
         var token = new JwtSecurityToken(
             issuer: _settings.Issuer,
             audience: _settings.Audience,

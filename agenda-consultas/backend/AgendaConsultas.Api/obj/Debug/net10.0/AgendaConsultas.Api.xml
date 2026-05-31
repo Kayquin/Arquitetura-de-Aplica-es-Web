@@ -56,6 +56,11 @@
             Lista consultas por paciente.
             </summary>
         </member>
+        <member name="M:AgendaConsultas.Api.Controllers.ConsultasController.GetSlots(System.String)">
+            <summary>
+            Lista horarios padronizados e disponibilidade por dia.
+            </summary>
+        </member>
         <member name="M:AgendaConsultas.Api.Controllers.ConsultasController.Create(AgendaConsultas.Api.Dtos.ConsultaCreateDto)">
             <summary>
             Cria uma nova consulta.

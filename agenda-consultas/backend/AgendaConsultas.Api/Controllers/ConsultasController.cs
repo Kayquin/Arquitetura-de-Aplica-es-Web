@@ -1,20 +1,26 @@
 using AgendaConsultas.Api.Dtos;
 using AgendaConsultas.Api.Models;
+using AgendaConsultas.Api.Repositories;
 using AgendaConsultas.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
+using System.Security.Claims;
 
 namespace AgendaConsultas.Api.Controllers;
 
 [ApiController]
 [Route("api/consultas")]
+[Authorize]
 public class ConsultasController : ControllerBase
 {
     private readonly IConsultaService _service;
+    private readonly IPacienteRepository _pacienteRepository;
 
-    public ConsultasController(IConsultaService service)
+    public ConsultasController(IConsultaService service, IPacienteRepository pacienteRepository)
     {
         _service = service;
+        _pacienteRepository = pacienteRepository;
     }
 
     /// <summary>
@@ -23,8 +29,26 @@ public class ConsultasController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<Consulta>>> GetAll()
     {
-        var consultas = await _service.GetAllAsync();
-        return Ok(consultas);
+        if (User.IsInRole("admin"))
+        {
+            var consultas = await _service.GetAllAsync();
+            return Ok(consultas);
+        }
+
+        var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.Name);
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return Unauthorized();
+        }
+
+        var paciente = await _pacienteRepository.GetByEmailAsync(email);
+        if (paciente is null)
+        {
+            return Ok(Array.Empty<Consulta>());
+        }
+
+        var consultasDoPaciente = await _service.GetByPacienteIdAsync(paciente.Id);
+        return Ok(consultasDoPaciente);
     }
 
     /// <summary>
@@ -36,6 +60,23 @@ public class ConsultasController : ControllerBase
         try
         {
             var consulta = await _service.GetByIdAsync(id);
+            if (User.IsInRole("admin"))
+            {
+                return Ok(consulta);
+            }
+
+            var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.Name);
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Unauthorized();
+            }
+
+            var paciente = await _pacienteRepository.GetByIdAsync(consulta.PacienteId);
+            if (paciente is null || !string.Equals(paciente.Email, email, StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid();
+            }
+
             return Ok(consulta);
         }
         catch (KeyNotFoundException ex)
@@ -50,8 +91,48 @@ public class ConsultasController : ControllerBase
     [HttpGet("paciente/{pacienteId}")]
     public async Task<ActionResult<List<Consulta>>> GetByPacienteId(string pacienteId)
     {
+        if (!User.IsInRole("admin"))
+        {
+            var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.Name);
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return Unauthorized();
+            }
+
+            var paciente = await _pacienteRepository.GetByIdAsync(pacienteId);
+            if (paciente is null || !string.Equals(paciente.Email, email, StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid();
+            }
+        }
+
         var consultas = await _service.GetByPacienteIdAsync(pacienteId);
         return Ok(consultas);
+    }
+
+    /// <summary>
+    /// Lista horarios padronizados e disponibilidade por dia.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("slots")]
+    public async Task<ActionResult<List<ConsultaSlotDto>>> GetSlots([FromQuery] string? date)
+    {
+        var dateValue = string.IsNullOrWhiteSpace(date)
+            ? DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : date;
+
+        if (!DateTime.TryParseExact(
+                dateValue,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed))
+        {
+            return BadRequest(new { message = "Data invalida. Use yyyy-MM-dd" });
+        }
+
+        var slots = await _service.GetSlotsAsync(parsed);
+        return Ok(slots);
     }
 
     /// <summary>
