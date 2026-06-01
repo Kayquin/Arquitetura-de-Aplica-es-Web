@@ -6,10 +6,11 @@ Aplicacao web para agenda de consultas medicas. O dominio usa duas entidades rel
 
 - CRUD de pacientes
 - CRUD de consultas
+- Horarios padronizados com bloqueio de conflito
 - Registro e login com JWT
 - Perfis admin e usuario
 - Swagger para documentacao
-- Frontend simples com navegacao assincrona
+- Frontend simples com navegacao assincrona e selecao de horarios
 
 ## Stack
 
@@ -23,6 +24,18 @@ Aplicacao web para agenda de consultas medicas. O dominio usa duas entidades rel
 - backend/AgendaConsultas.Tests -> testes unitarios
 - frontend -> pagina web
 - docker-compose.yml -> MongoDB local
+
+## Banco de dados (MongoDB)
+
+- ConnectionString padrao: mongodb://localhost:27017
+- DatabaseName padrao: AgendaConsultasDb
+- Colecoes: pacientes, consultas, usuarios
+
+Campos principais:
+
+- pacientes: nome, cpf, telefone, email
+- consultas: pacienteId, data (UTC), dataBrasil (-03:00), especialidade, status
+- usuarios: email, role, passwordHash
 
 ## Requisitos
 
@@ -130,6 +143,7 @@ POST /api/consultas
 
 - /api/pacientes (CRUD completo)
 - /api/consultas (CRUD completo)
+- /api/consultas/slots (horarios disponiveis)
 - /api/auth/register
 - /api/auth/login
 - /api/auth/role (admin)
@@ -141,8 +155,14 @@ POST /api/consultas
 - Depois de atualizar role, o usuario deve fazer login novamente.
 - Usuarios nao admin so veem consultas do paciente com o mesmo email do login.
 - Consultas so podem ser marcadas em horarios padronizados.
-- Use /api/consultas/slots?date=yyyy-MM-dd para ver horarios disponiveis.
+- Use /api/consultas/slots?date=yyyy-MM-dd para ver horarios disponiveis (date e opcional).
 - O endpoint de slots pode ser acessado sem login.
+
+## Horarios e fuso (Brasil)
+
+- A UI trabalha com horario do Brasil.
+- O banco salva a data em UTC no campo data.
+- A API gera dataBrasil com offset -03:00 para exibicao no frontend.
 
 ## Postman (lista completa)
 
@@ -219,7 +239,7 @@ POST /api/consultas
 ```
 {
 	"pacienteId": "<ID_PACIENTE>",
-	"data": "2026-05-28T14:00:00Z",
+	"data": "2026-06-01T08:00:00",
 	"especialidade": "clinico",
 	"status": "agendada"
 }
@@ -230,6 +250,16 @@ POST /api/consultas
 - Metodo: GET
 - URL: /api/consultas/paciente/{pacienteId}
 
+### Consultas - Listar todas (admin)
+
+- Metodo: GET
+- URL: /api/consultas
+
+### Consultas - Horarios disponiveis
+
+- Metodo: GET
+- URL: /api/consultas/slots?date=yyyy-MM-dd
+
 ### Consultas - Atualizar (admin)
 
 - Metodo: PUT
@@ -239,7 +269,7 @@ POST /api/consultas
 ```
 {
 	"pacienteId": "<ID_PACIENTE>",
-	"data": "2026-05-28T14:00:00Z",
+	"data": "2026-06-01T08:00:00",
 	"especialidade": "clinico",
 	"status": "concluida"
 }
