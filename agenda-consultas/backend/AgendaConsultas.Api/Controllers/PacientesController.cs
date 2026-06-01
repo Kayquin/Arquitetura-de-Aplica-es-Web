@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AgendaConsultas.Api.Controllers;
 
+// CRUD de pacientes com protecao por JWT.
 [ApiController]
 [Route("api/pacientes")]
 [Authorize]
@@ -24,6 +25,7 @@ public class PacientesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<Paciente>>> GetAll()
     {
+        // Lista simples sem filtros adicionais.
         var pacientes = await _service.GetAllAsync();
         return Ok(pacientes);
     }
@@ -36,6 +38,7 @@ public class PacientesController : ControllerBase
     {
         try
         {
+            // Service trata id inexistente.
             var paciente = await _service.GetByIdAsync(id);
             return Ok(paciente);
         }
@@ -62,6 +65,7 @@ public class PacientesController : ControllerBase
     {
         try
         {
+            // Valida e cria paciente.
             var paciente = await _service.CreateAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id = paciente.Id }, paciente);
         }
@@ -80,6 +84,7 @@ public class PacientesController : ControllerBase
     {
         try
         {
+            // Atualizacao restrita a admin.
             await _service.UpdateAsync(id, dto);
             return NoContent();
         }
@@ -102,6 +107,7 @@ public class PacientesController : ControllerBase
     {
         try
         {
+            // Remocao restrita a admin.
             await _service.DeleteAsync(id);
             return NoContent();
         }

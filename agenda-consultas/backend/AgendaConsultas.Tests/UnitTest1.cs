@@ -5,11 +5,13 @@ using AgendaConsultas.Api.Services;
 
 namespace AgendaConsultas.Tests;
 
+// Testes de regras do PacienteService.
 public class PacienteServiceTests
 {
     [Fact]
     public async Task CreatePaciente_ReturnsPaciente()
     {
+        // Arrange
         var repo = new InMemoryPacienteRepository();
         var service = new PacienteService(repo);
 
@@ -21,8 +23,10 @@ public class PacienteServiceTests
             Email = "ana@email.com"
         };
 
+        // Act
         var result = await service.CreateAsync(dto);
 
+        // Assert
         Assert.Equal(dto.Email, result.Email);
         Assert.Single(await repo.GetAllAsync());
     }
@@ -30,6 +34,7 @@ public class PacienteServiceTests
     [Fact]
     public async Task CreatePaciente_InvalidEmail_Throws()
     {
+        // Arrange
         var repo = new InMemoryPacienteRepository();
         var service = new PacienteService(repo);
 
@@ -41,12 +46,14 @@ public class PacienteServiceTests
             Email = "invalid"
         };
 
+        // Act/Assert
         await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(dto));
     }
 
     [Fact]
     public async Task CreatePaciente_DuplicateEmail_Throws()
     {
+        // Arrange
         var repo = new InMemoryPacienteRepository();
         var service = new PacienteService(repo);
 
@@ -58,6 +65,7 @@ public class PacienteServiceTests
             Email = "ana@email.com"
         };
 
+        // Act
         await service.CreateAsync(dto);
 
         var dtoDuplicado = new PacienteCreateDto
@@ -68,12 +76,14 @@ public class PacienteServiceTests
             Email = "ana@email.com"
         };
 
+        // Assert
         await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(dtoDuplicado));
     }
 
     [Fact]
     public async Task CreatePaciente_DuplicateCpf_Throws()
     {
+        // Arrange
         var repo = new InMemoryPacienteRepository();
         var service = new PacienteService(repo);
 
@@ -85,6 +95,7 @@ public class PacienteServiceTests
             Email = "ana@email.com"
         };
 
+        // Act
         await service.CreateAsync(dto);
 
         var dtoDuplicado = new PacienteCreateDto
@@ -95,12 +106,14 @@ public class PacienteServiceTests
             Email = "carlos@email.com"
         };
 
+        // Assert
         await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(dtoDuplicado));
     }
 
     [Fact]
     public async Task UpdatePaciente_NotFound_Throws()
     {
+        // Arrange
         var repo = new InMemoryPacienteRepository();
         var service = new PacienteService(repo);
 
@@ -112,21 +125,25 @@ public class PacienteServiceTests
             Email = "ana@email.com"
         };
 
+        // Act/Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.UpdateAsync("missing", dto));
     }
 
     [Fact]
     public async Task DeletePaciente_NotFound_Throws()
     {
+        // Arrange
         var repo = new InMemoryPacienteRepository();
         var service = new PacienteService(repo);
 
+        // Act/Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.DeleteAsync("missing"));
     }
 
     [Fact]
     public async Task UpdatePaciente_UpdatesData()
     {
+        // Arrange
         var repo = new InMemoryPacienteRepository();
         var service = new PacienteService(repo);
 
@@ -139,6 +156,7 @@ public class PacienteServiceTests
             Email = "ana@email.com"
         };
 
+        // Act
         await repo.CreateAsync(paciente);
 
         var dto = new PacienteUpdateDto
@@ -149,8 +167,10 @@ public class PacienteServiceTests
             Email = "ana@email.com"
         };
 
+        // Act
         await service.UpdateAsync("paciente1", dto);
 
+        // Assert
         var updated = await repo.GetByIdAsync("paciente1");
         Assert.NotNull(updated);
         Assert.Equal("Ana Maria", updated!.Nome);
@@ -158,11 +178,13 @@ public class PacienteServiceTests
     }
 }
 
+// Testes de regras do ConsultaService.
 public class ConsultaServiceTests
 {
     [Fact]
     public async Task CreateConsulta_ReturnsConsulta()
     {
+        // Arrange
         var (service, consultaRepo, pacienteRepo) = CreateConsultaService();
         var paciente = await CreatePacienteAsync(pacienteRepo);
         var dataLocal = BuildBrazilDate(2026, 6, 1, 8);
@@ -174,8 +196,10 @@ public class ConsultaServiceTests
             Status = "agendada"
         };
 
+        // Act
         var result = await service.CreateAsync(dto);
 
+        // Assert
         Assert.Equal(dto.PacienteId, result.PacienteId);
         Assert.Single(await consultaRepo.GetAllAsync());
     }
@@ -183,6 +207,7 @@ public class ConsultaServiceTests
     [Fact]
     public async Task CreateConsulta_PacienteMissing_Throws()
     {
+        // Arrange
         var (service, _, _) = CreateConsultaService();
         var dataLocal = BuildBrazilDate(2026, 6, 1, 8);
         var dto = new ConsultaCreateDto
@@ -193,12 +218,14 @@ public class ConsultaServiceTests
             Status = "agendada"
         };
 
+        // Act/Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.CreateAsync(dto));
     }
 
     [Fact]
     public async Task CreateConsulta_InvalidHorario_Throws()
     {
+        // Arrange
         var (service, _, pacienteRepo) = CreateConsultaService();
         var paciente = await CreatePacienteAsync(pacienteRepo);
         var dataLocal = BuildBrazilDate(2026, 6, 1, 12);
@@ -210,16 +237,19 @@ public class ConsultaServiceTests
             Status = "agendada"
         };
 
+        // Act/Assert
         await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(dto));
     }
 
     [Fact]
     public async Task CreateConsulta_HorarioOcupado_Throws()
     {
+        // Arrange
         var (service, consultaRepo, pacienteRepo) = CreateConsultaService();
         var paciente = await CreatePacienteAsync(pacienteRepo);
         var dataLocal = BuildBrazilDate(2026, 6, 1, 8);
 
+        // Act
         await service.CreateAsync(new ConsultaCreateDto
         {
             PacienteId = paciente.Id,
@@ -228,6 +258,7 @@ public class ConsultaServiceTests
             Status = "agendada"
         });
 
+        // Assert
         await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(new ConsultaCreateDto
         {
             PacienteId = paciente.Id,
@@ -242,10 +273,12 @@ public class ConsultaServiceTests
     [Fact]
     public async Task CreateConsulta_CanceladaPermiteMesmoHorario()
     {
+        // Arrange
         var (service, consultaRepo, pacienteRepo) = CreateConsultaService();
         var paciente = await CreatePacienteAsync(pacienteRepo);
         var dataLocal = BuildBrazilDate(2026, 6, 1, 9);
 
+        // Act
         await service.CreateAsync(new ConsultaCreateDto
         {
             PacienteId = paciente.Id,
@@ -254,6 +287,7 @@ public class ConsultaServiceTests
             Status = "cancelada"
         });
 
+        // Act
         var result = await service.CreateAsync(new ConsultaCreateDto
         {
             PacienteId = paciente.Id,
@@ -262,6 +296,7 @@ public class ConsultaServiceTests
             Status = "agendada"
         });
 
+        // Assert
         Assert.Equal("agendada", result.Status);
         Assert.Equal(2, (await consultaRepo.GetAllAsync()).Count);
     }
@@ -269,10 +304,12 @@ public class ConsultaServiceTests
     [Fact]
     public async Task CreateConsulta_SetsDataBrasil()
     {
+        // Arrange
         var (service, _, pacienteRepo) = CreateConsultaService();
         var paciente = await CreatePacienteAsync(pacienteRepo);
         var dataLocal = BuildBrazilDate(2026, 6, 1, 8);
 
+        // Act
         var result = await service.CreateAsync(new ConsultaCreateDto
         {
             PacienteId = paciente.Id,
@@ -281,6 +318,7 @@ public class ConsultaServiceTests
             Status = "agendada"
         });
 
+        // Assert
         Assert.False(string.IsNullOrWhiteSpace(result.DataBrasil));
         Assert.Contains("2026-06-01T08:00:00", result.DataBrasil);
         Assert.EndsWith("-03:00", result.DataBrasil);
@@ -289,10 +327,12 @@ public class ConsultaServiceTests
     [Fact]
     public async Task GetSlotsAsync_MarcaHorarioOcupado()
     {
+        // Arrange
         var (service, _, pacienteRepo) = CreateConsultaService();
         var paciente = await CreatePacienteAsync(pacienteRepo);
         var dataLocal = BuildBrazilDate(2026, 6, 1, 8);
 
+        // Act
         await service.CreateAsync(new ConsultaCreateDto
         {
             PacienteId = paciente.Id,
@@ -301,7 +341,9 @@ public class ConsultaServiceTests
             Status = "agendada"
         });
 
+        // Act
         var slots = await service.GetSlotsAsync(new DateTime(2026, 6, 1));
+        // Assert
         Assert.Equal(9, slots.Count);
         Assert.Contains(slots, slot => slot.Data.TimeOfDay == TimeSpan.FromHours(8) && !slot.Disponivel);
     }
@@ -309,6 +351,7 @@ public class ConsultaServiceTests
     private static (ConsultaService service, InMemoryConsultaRepository consultaRepo, InMemoryPacienteRepository pacienteRepo)
         CreateConsultaService()
     {
+        // Helper para criar services com repositorios em memoria.
         var pacienteRepo = new InMemoryPacienteRepository();
         var consultaRepo = new InMemoryConsultaRepository();
         var service = new ConsultaService(consultaRepo, pacienteRepo);
@@ -317,6 +360,7 @@ public class ConsultaServiceTests
 
     private static async Task<Paciente> CreatePacienteAsync(InMemoryPacienteRepository repo)
     {
+        // Helper para criar um paciente padrao.
         var paciente = new Paciente
         {
             Id = "paciente1",
@@ -331,9 +375,11 @@ public class ConsultaServiceTests
     }
 
     private static DateTime BuildBrazilDate(int year, int month, int day, int hour) =>
+        // DateTime sem kind, tratado como horario Brasil pelo service.
         DateTime.SpecifyKind(new DateTime(year, month, day, hour, 0, 0), DateTimeKind.Unspecified);
 }
 
+// Repositorio em memoria para testes de pacientes.
 internal class InMemoryPacienteRepository : IPacienteRepository
 {
     private readonly List<Paciente> _items = new();
@@ -379,6 +425,7 @@ internal class InMemoryPacienteRepository : IPacienteRepository
         Task.FromResult(_items.Any(p => p.Cpf == cpf));
 }
 
+// Repositorio em memoria para testes de consultas.
 internal class InMemoryConsultaRepository : IConsultaRepository
 {
     private readonly List<Consulta> _items = new();
@@ -420,6 +467,7 @@ internal class InMemoryConsultaRepository : IConsultaRepository
         Task.FromResult(_items.Any(c => c.Id == id));
 
     public Task<bool> ExistsAtAsync(DateTime data, string? ignoreId = null) =>
+        // Simula regra de conflito ignorando canceladas.
         Task.FromResult(_items.Any(c =>
             c.Data == data &&
             c.Status != "cancelada" &&

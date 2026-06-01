@@ -4,6 +4,7 @@ using AgendaConsultas.Api.Repositories;
 
 namespace AgendaConsultas.Api.Services;
 
+// Regras de autenticacao e cadastro de usuarios.
 public class AuthService : IAuthService
 {
     private readonly IUsuarioRepository _usuarioRepository;
@@ -17,6 +18,7 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RegisterAsync(AuthRegisterDto dto)
     {
+        // Validacoes basicas antes de gravar no banco.
         // Validacao basica do cadastro.
         if (string.IsNullOrWhiteSpace(dto.Email) || !dto.Email.Contains('@'))
         {
@@ -61,6 +63,7 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> LoginAsync(AuthLoginDto dto)
     {
+        // Busca usuario e verifica hash da senha.
         // Valida credenciais e emite token.
         var usuario = await _usuarioRepository.GetByEmailAsync(dto.Email.Trim());
         if (usuario is null || !BCrypt.Net.BCrypt.Verify(dto.Password, usuario.PasswordHash))
@@ -78,6 +81,7 @@ public class AuthService : IAuthService
 
     public async Task<AuthRoleUpdateResponseDto> UpdateRoleAsync(AuthRoleUpdateDto dto)
     {
+        // Somente admin pode alterar role.
         // Fluxo de alteracao de role (admin).
         if (string.IsNullOrWhiteSpace(dto.Email) || !dto.Email.Contains('@'))
         {

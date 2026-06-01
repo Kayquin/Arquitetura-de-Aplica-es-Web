@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AgendaConsultas.Api.Controllers;
 
+// Endpoints de autenticacao e gerenciamento de roles.
 [ApiController]
 [Route("api/auth")]
 public class AuthController : ControllerBase
@@ -32,6 +33,7 @@ public class AuthController : ControllerBase
     {
         try
         {
+            // Delegado para o service que valida e cria o usuario.
             var response = await _authService.RegisterAsync(dto);
             return Ok(response);
         }
@@ -56,6 +58,7 @@ public class AuthController : ControllerBase
     {
         try
         {
+            // Service valida credenciais e emite JWT.
             var response = await _authService.LoginAsync(dto);
             return Ok(response);
         }
@@ -81,6 +84,7 @@ public class AuthController : ControllerBase
     {
         try
         {
+            // Apenas admin pode alterar role de outros usuarios.
             var response = await _authService.UpdateRoleAsync(dto);
             return Ok(response);
         }

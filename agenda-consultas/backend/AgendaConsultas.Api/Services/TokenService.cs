@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace AgendaConsultas.Api.Services;
 
+// Gera tokens JWT com claims padrao da aplicacao.
 public class TokenService : ITokenService
 {
     private readonly JwtSettings _settings;
@@ -19,6 +20,7 @@ public class TokenService : ITokenService
 
     public string CreateToken(Usuario usuario)
     {
+        // Chave e credenciais para assinatura do token.
         // Cria JWT com claims de email e role.
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Key));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

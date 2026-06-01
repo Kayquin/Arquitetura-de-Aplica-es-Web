@@ -8,8 +8,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
+// Bootstrap da API e configuracao do pipeline HTTP.
 var builder = WebApplication.CreateBuilder(args);
 
+// Habilita controllers e validacao automatica de modelos.
 builder.Services.AddControllers();
 
 // Carrega configuracoes de MongoDB e JWT.
@@ -73,6 +75,7 @@ app.UseCors("AllowAll");
 
 if (app.Environment.IsDevelopment())
 {
+    // Swagger apenas em ambiente de desenvolvimento.
     app.UseSwagger();
     app.UseSwaggerUI();
 }
@@ -81,6 +84,7 @@ if (app.Environment.IsDevelopment())
 var frontendPath = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "frontend"));
 if (Directory.Exists(frontendPath))
 {
+    // Usa index.html como default e expõe arquivos estaticos.
     app.UseDefaultFiles(new DefaultFilesOptions
     {
         FileProvider = new PhysicalFileProvider(frontendPath)

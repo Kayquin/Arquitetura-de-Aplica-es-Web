@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AgendaConsultas.Api.Controllers;
 
+// Endpoints administrativos para listar/remover usuarios.
 [ApiController]
 [Route("api/usuarios")]
 [Authorize(Roles = "admin")]
@@ -23,6 +24,7 @@ public class UsuariosController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<UsuarioListDto>>> GetAll()
     {
+        // Lista simplificada de usuarios.
         var usuarios = await _service.GetAllAsync();
         return Ok(usuarios);
     }
@@ -35,6 +37,7 @@ public class UsuariosController : ControllerBase
     {
         try
         {
+            // Remocao definitiva do usuario.
             await _service.DeleteAsync(id);
             return NoContent();
         }

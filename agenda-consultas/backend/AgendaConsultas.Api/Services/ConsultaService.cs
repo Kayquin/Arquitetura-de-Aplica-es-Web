@@ -6,11 +6,14 @@ using System.Linq;
 
 namespace AgendaConsultas.Api.Services;
 
+// Regras de negocio de consultas, incluindo horarios padronizados e fuso Brasil.
 public class ConsultaService : IConsultaService
 {
     private readonly IConsultaRepository _consultaRepository;
     private readonly IPacienteRepository _pacienteRepository;
+    // Timezone oficial para regras de horario.
     private static readonly TimeZoneInfo BrazilTimeZone = GetBrazilTimeZone();
+    // Horarios padronizados de atendimento.
     private static readonly TimeSpan[] HorariosPadrao =
     {
         TimeSpan.FromHours(8),
@@ -37,11 +40,14 @@ public class ConsultaService : IConsultaService
 
     public async Task<List<ConsultaSlotDto>> GetSlotsAsync(DateTime date)
     {
+        // Gera janela do dia no horario do Brasil.
         var startBrazil = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
         var endBrazil = startBrazil.AddDays(1);
+        // Converte para UTC antes de consultar no banco.
         var consultasDoDia = await _consultaRepository.GetByDateRangeAsync(
             ToUtcFromBrazil(startBrazil),
             ToUtcFromBrazil(endBrazil));
+        // Marca horarios ocupados, ignorando consultas canceladas.
         var ocupados = new HashSet<TimeSpan>(
             consultasDoDia
                 .Where(c => !IsCancelada(c.Status))
@@ -69,6 +75,7 @@ public class ConsultaService : IConsultaService
 
     public async Task<Consulta> CreateAsync(ConsultaCreateDto dto)
     {
+        // Valida campos e horario.
         // Garante paciente existente antes de criar consulta.
         ValidateConsulta(dto.PacienteId, dto.Data, dto.Especialidade);
 
@@ -77,6 +84,7 @@ public class ConsultaService : IConsultaService
             throw new ArgumentException("Horario invalido. Use horarios padronizados.");
         }
 
+        // Converte o horario Brasil para UTC antes de salvar.
         var dataUtc = ToUtcFromBrazil(dto.Data);
 
         if (!await _pacienteRepository.ExistsAsync(dto.PacienteId))
@@ -84,6 +92,7 @@ public class ConsultaService : IConsultaService
             throw new KeyNotFoundException("Paciente not found");
         }
 
+        // Normaliza status e verifica conflito de horario.
         var status = NormalizeStatus(dto.Status);
         if (!IsCancelada(status) && await _consultaRepository.ExistsAtAsync(dataUtc))
         {
@@ -95,6 +104,7 @@ public class ConsultaService : IConsultaService
             Id = ObjectId.GenerateNewId().ToString(),
             PacienteId = dto.PacienteId.Trim(),
             Data = dataUtc,
+            // Campo auxiliar para exibicao no front.
             DataBrasil = FormatBrazilOffset(dto.Data),
             Especialidade = dto.Especialidade.Trim(),
             Status = status
@@ -106,6 +116,7 @@ public class ConsultaService : IConsultaService
 
     public async Task UpdateAsync(string id, ConsultaUpdateDto dto)
     {
+        // Valida campos e existencia.
         // Bloqueia update se consulta ou paciente nao existir.
         ValidateConsulta(dto.PacienteId, dto.Data, dto.Especialidade);
 
@@ -115,6 +126,7 @@ public class ConsultaService : IConsultaService
             throw new KeyNotFoundException("Consulta not found");
         }
 
+        // Converte o horario Brasil para UTC antes de salvar.
         var dataUtc = ToUtcFromBrazil(dto.Data);
 
         if (!IsHorarioPadrao(dto.Data) && dataUtc != existing.Data)
@@ -127,6 +139,7 @@ public class ConsultaService : IConsultaService
             throw new KeyNotFoundException("Paciente not found");
         }
 
+        // Normaliza status e evita conflito em horarios ocupados.
         var status = NormalizeStatus(dto.Status);
         if (!IsCancelada(status) && await _consultaRepository.ExistsAtAsync(dataUtc, existing.Id))
         {
@@ -138,6 +151,7 @@ public class ConsultaService : IConsultaService
             Id = existing.Id,
             PacienteId = dto.PacienteId.Trim(),
             Data = dataUtc,
+            // Campo auxiliar para exibicao no front.
             DataBrasil = FormatBrazilOffset(dto.Data),
             Especialidade = dto.Especialidade.Trim(),
             Status = status
@@ -159,6 +173,7 @@ public class ConsultaService : IConsultaService
 
     private static void ValidateConsulta(string pacienteId, DateTime data, string especialidade)
     {
+        // Validacoes basicas de request.
         if (string.IsNullOrWhiteSpace(pacienteId))
         {
             throw new ArgumentException("PacienteId is required");
@@ -186,6 +201,7 @@ public class ConsultaService : IConsultaService
 
     private static DateTime ToBrazilTime(DateTime value)
     {
+        // Converte data para horario do Brasil mantendo o dia correto.
         if (value.Kind == DateTimeKind.Utc)
         {
             return TimeZoneInfo.ConvertTimeFromUtc(value, BrazilTimeZone);
@@ -201,6 +217,7 @@ public class ConsultaService : IConsultaService
 
     private static DateTime ToUtcFromBrazil(DateTime value)
     {
+        // Assume que a data recebida esta no horario do Brasil.
         if (value.Kind == DateTimeKind.Utc)
         {
             return value;
@@ -214,6 +231,7 @@ public class ConsultaService : IConsultaService
 
     private static TimeZoneInfo GetBrazilTimeZone()
     {
+        // Windows usa "E. South America Standard Time".
         try
         {
             return TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
@@ -225,11 +243,13 @@ public class ConsultaService : IConsultaService
         {
         }
 
+        // Linux/containers usam "America/Sao_Paulo".
         return TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
     }
 
     private static string FormatBrazilOffset(DateTime value)
     {
+        // Serializa a data no formato ISO com offset -03:00.
         var brazil = value.Kind == DateTimeKind.Unspecified
             ? value
             : DateTime.SpecifyKind(value, DateTimeKind.Unspecified);

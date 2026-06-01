@@ -9,6 +9,7 @@ using System.Security.Claims;
 
 namespace AgendaConsultas.Api.Controllers;
 
+// CRUD de consultas com regras de visibilidade por role.
 [ApiController]
 [Route("api/consultas")]
 [Authorize]
@@ -29,12 +30,14 @@ public class ConsultasController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<Consulta>>> GetAll()
     {
+        // Admin ve todas as consultas.
         if (User.IsInRole("admin"))
         {
             var consultas = await _service.GetAllAsync();
             return Ok(consultas);
         }
 
+        // Usuario comum ve apenas consultas do seu email.
         var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.Name);
         if (string.IsNullOrWhiteSpace(email))
         {
@@ -60,11 +63,13 @@ public class ConsultasController : ControllerBase
         try
         {
             var consulta = await _service.GetByIdAsync(id);
+            // Admin acessa livremente.
             if (User.IsInRole("admin"))
             {
                 return Ok(consulta);
             }
 
+            // Usuario comum precisa ser dono da consulta.
             var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.Name);
             if (string.IsNullOrWhiteSpace(email))
             {
@@ -91,6 +96,7 @@ public class ConsultasController : ControllerBase
     [HttpGet("paciente/{pacienteId}")]
     public async Task<ActionResult<List<Consulta>>> GetByPacienteId(string pacienteId)
     {
+        // Usuario comum so consulta o proprio paciente.
         if (!User.IsInRole("admin"))
         {
             var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.Name);
@@ -117,10 +123,12 @@ public class ConsultasController : ControllerBase
     [HttpGet("slots")]
     public async Task<ActionResult<List<ConsultaSlotDto>>> GetSlots([FromQuery] string? date)
     {
+        // Date opcional: quando vazio, usa a data de hoje.
         var dateValue = string.IsNullOrWhiteSpace(date)
             ? DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
             : date;
 
+        // Valida formato yyyy-MM-dd para evitar parsing ambiguo.
         if (!DateTime.TryParseExact(
                 dateValue,
                 "yyyy-MM-dd",
@@ -152,6 +160,7 @@ public class ConsultasController : ControllerBase
     {
         try
         {
+            // Service valida horario e conflito.
             var consulta = await _service.CreateAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id = consulta.Id }, consulta);
         }
@@ -174,6 +183,7 @@ public class ConsultasController : ControllerBase
     {
         try
         {
+            // Atualizacao de consulta e restrita a admin.
             await _service.UpdateAsync(id, dto);
             return NoContent();
         }
@@ -196,6 +206,7 @@ public class ConsultasController : ControllerBase
     {
         try
         {
+            // Remocao de consulta e restrita a admin.
             await _service.DeleteAsync(id);
             return NoContent();
         }

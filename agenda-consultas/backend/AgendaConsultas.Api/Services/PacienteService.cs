@@ -5,6 +5,7 @@ using MongoDB.Bson;
 
 namespace AgendaConsultas.Api.Services;
 
+// Regras de negocio para pacientes.
 public class PacienteService : IPacienteService
 {
     private readonly IPacienteRepository _repository;
@@ -18,6 +19,7 @@ public class PacienteService : IPacienteService
 
     public async Task<Paciente> GetByIdAsync(string id)
     {
+        // Valida existencia do paciente.
         var paciente = await _repository.GetByIdAsync(id);
         if (paciente is null)
         {
@@ -29,6 +31,7 @@ public class PacienteService : IPacienteService
 
     public async Task<Paciente> CreateAsync(PacienteCreateDto dto)
     {
+        // Validacoes de campos e unicidade.
         // Valida e garante email/cpf unicos.
         ValidatePaciente(dto.Nome, dto.Cpf, dto.Telefone, dto.Email);
 
@@ -57,6 +60,7 @@ public class PacienteService : IPacienteService
 
     public async Task UpdateAsync(string id, PacienteUpdateDto dto)
     {
+        // Valida e garante existencia antes de atualizar.
         // Rejeita update para id inexistente.
         ValidatePaciente(dto.Nome, dto.Cpf, dto.Telefone, dto.Email);
 
@@ -80,6 +84,7 @@ public class PacienteService : IPacienteService
 
     public async Task DeleteAsync(string id)
     {
+        // Bloqueia delete quando o id nao existe.
         var existing = await _repository.GetByIdAsync(id);
         if (existing is null)
         {

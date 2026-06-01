@@ -5,6 +5,7 @@ using MongoDB.Driver;
 
 namespace AgendaConsultas.Api.Repositories;
 
+// Acesso aos dados de usuarios no MongoDB.
 public class UsuarioRepository : IUsuarioRepository
 {
     private readonly IMongoCollection<Usuario> _collection;
@@ -18,6 +19,7 @@ public class UsuarioRepository : IUsuarioRepository
         await _collection.Find(u => u.Email == email).FirstOrDefaultAsync();
 
     public async Task<Usuario?> GetByIdAsync(string id) =>
+        // Evita erro quando o id nao e ObjectId valido.
         ObjectId.TryParse(id, out _) ?
             await _collection.Find(u => u.Id == id).FirstOrDefaultAsync() :
             null;
@@ -30,11 +32,13 @@ public class UsuarioRepository : IUsuarioRepository
 
     public Task UpdateRoleAsync(string email, string role)
     {
+        // Atualiza role por email.
         var update = Builders<Usuario>.Update.Set(u => u.Role, role);
         return _collection.UpdateOneAsync(u => u.Email == email, update);
     }
 
     public Task DeleteAsync(string id) =>
+        // Delete silencioso se id invalido.
         ObjectId.TryParse(id, out _) ?
             _collection.DeleteOneAsync(u => u.Id == id) :
             Task.CompletedTask;
