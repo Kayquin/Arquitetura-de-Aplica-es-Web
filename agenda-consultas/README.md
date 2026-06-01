@@ -1,6 +1,6 @@
-# Agenda de Consultas
+﻿# Agenda de Consultas
 
-Aplicacao full stack para gestao de pacientes e consultas, com JWT, MongoDB e controle de acesso por role (`admin` e `usuario`).
+Aplicacao full stack para gestao de pacientes e consultas, com JWT, MongoDB e controle de acesso por perfil (`admin` e `usuario`).
 
 ## Stack
 
@@ -12,10 +12,10 @@ Aplicacao full stack para gestao de pacientes e consultas, com JWT, MongoDB e co
 ## Estrutura do repositorio
 
 - `backend/AgendaConsultas.Api`: API e frontend estatico
-- `backend/AgendaConsultas.Tests`: testes unitarios de services
+- `backend/AgendaConsultas.Tests`: testes unitarios de servicos
 - `frontend`: arquivos do front (`index.html`, `app.js`, `styles.css`)
 - `docker-compose.yml`: MongoDB local
-- `SOLID.md`: resumo de aplicacao de principios SOLID
+- `SOLID.md`: resumo da aplicacao dos principios SOLID
 
 ## Fluxo funcional atual
 
@@ -24,7 +24,7 @@ Aplicacao full stack para gestao de pacientes e consultas, com JWT, MongoDB e co
 - Um formulario unico com dois modos:
   - `Entrar`: pede `email` e `senha`
   - `Criar conta`: pede `email`, `senha`, `nome`, `cpf`, `telefone`
-- No cadastro pelo front, o role e sempre `usuario`.
+- No cadastro pelo front, o perfil e sempre `usuario`.
 
 ### Comportamento por role
 
@@ -45,7 +45,7 @@ Aplicacao full stack para gestao de pacientes e consultas, com JWT, MongoDB e co
 No modal `Novo paciente` (aba Pacientes), admin pode:
 
 1. usar email de usuario ja existente (sem senha)
-2. informar email novo + senha (min 6), e a API cria usuario `usuario` e paciente no mesmo fluxo
+2. informar email novo + senha (minimo 6), e a API cria usuario `usuario` e paciente no mesmo fluxo
 
 ## Permissoes da API
 
@@ -72,7 +72,7 @@ No modal `Novo paciente` (aba Pacientes), admin pode:
 
 - Horarios padrao: `08:00`, `09:00`, `10:00`, `11:00`, `13:00`, `14:00`, `15:00`, `16:00`, `17:00`.
 - A API recebe horario no contexto Brasil (`America/Sao_Paulo`) e salva em UTC.
-- Campo `dataBrasil` e gerado para exibicao no front.
+- O campo `dataBrasil` e gerado para exibicao no front.
 - Slots: `GET /api/consultas/slots?date=yyyy-MM-dd`.
 
 ## Requisitos
@@ -118,7 +118,7 @@ dotnet run --project backend/AgendaConsultas.Api
 
 ## Exemplos de payload
 
-### Register de usuario (front)
+### Cadastro de usuario (front)
 
 `POST /api/auth/register`
 
