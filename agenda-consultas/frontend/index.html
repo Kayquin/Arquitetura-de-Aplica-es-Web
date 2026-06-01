@@ -9,6 +9,7 @@
 <body>
   <div class="backdrop"></div>
 
+  <!-- Hero com contexto do sistema -->
   <header class="hero">
     <div class="hero-copy">
       <span class="eyebrow">Agenda de Consultas</span>
@@ -29,6 +30,7 @@
     </div>
   </header>
 
+  <!-- Navegacao principal entre views -->
   <nav class="nav">
     <button data-view="auth" id="navAuth" class="active">Autenticacao</button>
     <button data-view="pacientes" id="navPacientes">Pacientes</button>
@@ -37,30 +39,30 @@
     <button data-view="config" id="navConfig" hidden>Conexao da API</button>
   </nav>
 
+  <!-- Conteudo principal (views alternadas via JS) -->
   <main class="content">
+    <!-- View de autenticacao -->
     <section id="view-auth" class="view active">
       <section class="panel auth-panel">
         <div class="panel-header">
           <h2>Autenticacao</h2>
-          <p>Crie contas e gerencie tokens de acesso.</p>
+          <p>Acesse em etapas: escolha a acao e informe seus dados.</p>
         </div>
         <div class="auth-grid">
-          <form id="registerForm" class="card">
-            <h3>Registrar</h3>
-            <input id="regEmail" type="email" placeholder="Email" required />
-            <input id="regPassword" type="password" placeholder="Senha" minlength="6" required />
-            <select id="regRole">
-              <option value="usuario">usuario</option>
-              <option value="admin">admin</option>
-            </select>
-            <button type="submit">Criar conta</button>
+          <!-- Fluxo unico para login e registro -->
+          <form id="authForm" class="card">
+            <h3 id="authFormTitle">Etapa 1: escolha a acao</h3>
+            <div class="auth-mode" role="radiogroup" aria-label="Modo de autenticacao">
+              <button type="button" id="modeLogin" class="mode-button active" aria-pressed="true">Entrar</button>
+              <button type="button" id="modeRegister" class="mode-button" aria-pressed="false">Criar conta</button>
+            </div>
+            <p class="hint" id="authStepHint">Etapa 2: informe email e senha para entrar.</p>
+            <p class="hint auth-mode-info" id="authModeInfo">Modo login: acesso rapido.</p>
+            <input id="authEmail" type="email" placeholder="Email" required />
+            <input id="authPassword" type="password" placeholder="Senha" minlength="6" required />
+            <button id="authSubmit" type="submit">Entrar</button>
           </form>
-          <form id="loginForm" class="card">
-            <h3>Login</h3>
-            <input id="loginEmail" type="email" placeholder="Email" required />
-            <input id="loginPassword" type="password" placeholder="Senha" required />
-            <button type="submit">Entrar</button>
-          </form>
+          <!-- Estado atual do token/login -->
           <div class="card token-box">
             <h3>Status</h3>
             <p id="authStatus">Sem login</p>
@@ -70,6 +72,7 @@
       </section>
     </section>
 
+    <!-- View de pacientes -->
     <section id="view-pacientes" class="view">
       <div class="content-grid">
         <div class="list-panel">
@@ -79,17 +82,25 @@
           </div>
           <ul id="pacienteList" class="list"></ul>
         </div>
-        <form id="pacienteForm" class="card form-panel">
-          <h3>Novo paciente</h3>
-          <input id="pacienteNome" type="text" placeholder="Nome completo" required />
-          <input id="pacienteCpf" type="text" placeholder="CPF" required />
-          <input id="pacienteTelefone" type="text" placeholder="Telefone" required />
-          <input id="pacienteEmail" type="email" placeholder="Email" required />
-          <button type="submit">Salvar</button>
+
+        <!-- Marcacao de consulta para usuario -->
+        <form id="pacienteConsultaForm" class="card form-panel" hidden>
+          <h3>Marcar consulta</h3>
+          <p id="pacienteConsultaSelecionado" class="hint">Selecione um paciente</p>
+          <input id="pacienteConsultaData" type="date" required />
+          <select id="pacienteConsultaHorario" required></select>
+          <input id="pacienteConsultaEspecialidade" type="text" placeholder="Especialidade" required />
+          <button type="submit">Marcar</button>
         </form>
+
+        <div id="pacienteAdminActions" class="card form-panel" hidden>
+          <h3>Acoes de admin</h3>
+          <button id="openPacienteModal" type="button">Novo paciente</button>
+        </div>
       </div>
     </section>
 
+    <!-- View de consultas -->
     <section id="view-consultas" class="view">
       <div class="content-grid">
         <div class="list-panel">
@@ -99,21 +110,14 @@
           </div>
           <ul id="consultaList" class="list"></ul>
         </div>
-        <form id="consultaForm" class="card form-panel">
-          <h3>Nova consulta</h3>
-          <input id="consultaData" type="date" required />
-          <select id="consultaHorario" required></select>
-          <input id="consultaEspecialidade" type="text" placeholder="Especialidade" required />
-          <select id="consultaStatus">
-            <option value="agendada">agendada</option>
-            <option value="concluida">concluida</option>
-            <option value="cancelada">cancelada</option>
-          </select>
-          <button type="submit">Salvar</button>
-        </form>
+        <div id="consultaAdminActions" class="card form-panel" hidden>
+          <h3>Acoes de admin</h3>
+          <button id="openConsultaModal" type="button">Nova consulta</button>
+        </div>
       </div>
     </section>
 
+    <!-- View administrativa de usuarios -->
     <section id="view-usuarios" class="view">
       <div class="content-grid">
         <div class="list-panel">
@@ -123,18 +127,14 @@
           </div>
           <ul id="usuarioList" class="list"></ul>
         </div>
-        <form id="roleForm" class="card form-panel">
-          <h3>Atualizar role</h3>
-          <input id="roleEmail" type="email" placeholder="Email do usuario" required />
-          <select id="roleValue">
-            <option value="usuario">usuario</option>
-            <option value="admin">admin</option>
-          </select>
-          <button type="submit">Atualizar</button>
-        </form>
+        <div id="usuarioAdminActions" class="card form-panel" hidden>
+          <h3>Acoes de admin</h3>
+          <button id="openRoleModal" type="button">Atualizar role</button>
+        </div>
       </div>
     </section>
 
+    <!-- View de configuracao da API -->
     <section id="view-config" class="view">
       <div class="content-grid">
         <div class="card form-panel">
@@ -156,6 +156,72 @@
         </div>
       </div>
     </section>
+
+    <!-- Modal de paciente (admin) -->
+    <div id="pacienteModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-modal="pacienteModal"></div>
+      <div class="modal-dialog card" role="dialog" aria-modal="true" aria-labelledby="pacienteModalTitle">
+        <div class="modal-header">
+          <h3 id="pacienteModalTitle">Novo paciente</h3>
+          <button type="button" class="modal-close" data-close-modal="pacienteModal">Fechar</button>
+        </div>
+        <form id="pacienteForm">
+          <input id="pacienteNome" type="text" placeholder="Nome completo" required />
+          <input id="pacienteCpf" type="text" placeholder="CPF" required />
+          <input id="pacienteTelefone" type="text" placeholder="Telefone" required />
+          <div id="pacienteUsuarioGroup" class="field-group" hidden>
+            <label for="pacienteUsuario">Vincular ao usuario</label>
+            <select id="pacienteUsuario">
+              <option value="">Selecione um usuario cadastrado</option>
+            </select>
+          </div>
+          <input id="pacienteEmail" type="email" placeholder="Email" required />
+          <input id="pacientePassword" type="password" placeholder="Senha para criar usuario novo (min 6)" />
+          <button type="submit">Salvar</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal de consulta (admin) -->
+    <div id="consultaModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-modal="consultaModal"></div>
+      <div class="modal-dialog card" role="dialog" aria-modal="true" aria-labelledby="consultaModalTitle">
+        <div class="modal-header">
+          <h3 id="consultaModalTitle">Nova consulta</h3>
+          <button type="button" class="modal-close" data-close-modal="consultaModal">Fechar</button>
+        </div>
+        <form id="consultaForm">
+          <input id="consultaData" type="date" required />
+          <select id="consultaHorario" required></select>
+          <input id="consultaEspecialidade" type="text" placeholder="Especialidade" required />
+          <select id="consultaStatus">
+            <option value="agendada">agendada</option>
+            <option value="concluida">concluida</option>
+            <option value="cancelada">cancelada</option>
+          </select>
+          <button type="submit">Salvar</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal de role (admin) -->
+    <div id="roleModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-modal="roleModal"></div>
+      <div class="modal-dialog card" role="dialog" aria-modal="true" aria-labelledby="roleModalTitle">
+        <div class="modal-header">
+          <h3 id="roleModalTitle">Atualizar role</h3>
+          <button type="button" class="modal-close" data-close-modal="roleModal">Fechar</button>
+        </div>
+        <form id="roleForm">
+          <input id="roleEmail" type="email" placeholder="Email do usuario" required />
+          <select id="roleValue">
+            <option value="usuario">usuario</option>
+            <option value="admin">admin</option>
+          </select>
+          <button type="submit">Atualizar</button>
+        </form>
+      </div>
+    </div>
   </main>
 
   <footer class="footer">

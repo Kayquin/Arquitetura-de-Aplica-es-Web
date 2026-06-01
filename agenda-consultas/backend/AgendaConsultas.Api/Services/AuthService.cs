@@ -9,11 +9,16 @@ public class AuthService : IAuthService
 {
     private readonly IUsuarioRepository _usuarioRepository;
     private readonly ITokenService _tokenService;
+    private readonly IPacienteService _pacienteService;
 
-    public AuthService(IUsuarioRepository usuarioRepository, ITokenService tokenService)
+    public AuthService(
+        IUsuarioRepository usuarioRepository,
+        ITokenService tokenService,
+        IPacienteService pacienteService)
     {
         _usuarioRepository = usuarioRepository;
         _tokenService = tokenService;
+        _pacienteService = pacienteService;
     }
 
     public async Task<AuthResponseDto> RegisterAsync(AuthRegisterDto dto)
@@ -43,15 +48,70 @@ public class AuthService : IAuthService
             throw new ArgumentException("Role is invalid");
         }
 
+        if (role == "usuario")
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+            {
+                throw new ArgumentException("Nome is required");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Cpf))
+            {
+                throw new ArgumentException("Cpf is required");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Telefone))
+            {
+                throw new ArgumentException("Telefone is required");
+            }
+
+            var cpfDigits = OnlyDigits(dto.Cpf);
+            if (cpfDigits.Length != 11)
+            {
+                throw new ArgumentException("Cpf is invalid");
+            }
+
+            var telefoneDigits = OnlyDigits(dto.Telefone);
+            if (telefoneDigits.Length < 10 || telefoneDigits.Length > 11)
+            {
+                throw new ArgumentException("Telefone is invalid");
+            }
+        }
+
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+
         // Hash da senha antes de salvar.
         var usuario = new Usuario
         {
-            Email = dto.Email.Trim(),
+            Email = normalizedEmail,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = role
         };
 
         await _usuarioRepository.CreateAsync(usuario);
+
+        if (role == "usuario")
+        {
+            try
+            {
+                await _pacienteService.CreateAsync(new PacienteCreateDto
+                {
+                    Nome = dto.Nome,
+                    Cpf = OnlyDigits(dto.Cpf),
+                    Telefone = OnlyDigits(dto.Telefone),
+                    Email = normalizedEmail
+                });
+            }
+            catch
+            {
+                var createdUser = await _usuarioRepository.GetByEmailAsync(normalizedEmail);
+                if (createdUser is not null)
+                {
+                    await _usuarioRepository.DeleteAsync(createdUser.Id);
+                }
+                throw;
+            }
+        }
 
         return new AuthResponseDto
         {
@@ -108,4 +168,7 @@ public class AuthService : IAuthService
             Role = role
         };
     }
+
+    private static string OnlyDigits(string value) =>
+        string.IsNullOrWhiteSpace(value) ? string.Empty : new string(value.Where(char.IsDigit).ToArray());
 }

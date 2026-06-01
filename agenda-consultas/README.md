@@ -1,323 +1,198 @@
 # Agenda de Consultas
 
-Aplicacao web para agenda de consultas medicas. O dominio usa duas entidades relacionadas (Pacientes e Consultas). A API oferece CRUD completo, Swagger e autenticacao JWT com perfis admin/usuario.
-
-## Funcionalidades
-
-- CRUD de pacientes
-- CRUD de consultas
-- Horarios padronizados com bloqueio de conflito
-- Registro e login com JWT
-- Perfis admin e usuario
-- Swagger para documentacao
-- Frontend simples com navegacao assincrona e selecao de horarios
+Aplicacao full stack para gestao de pacientes e consultas, com JWT, MongoDB e controle de acesso por role (`admin` e `usuario`).
 
 ## Stack
 
-- Backend: .NET 10 Web API
+- Backend: ASP.NET Core Web API (.NET 10)
 - Banco: MongoDB
-- Frontend: HTML + JavaScript (fetch)
+- Frontend: HTML + CSS + JavaScript (fetch)
+- Auth: JWT + BCrypt
 
-## Estrutura
+## Estrutura do repositorio
 
-- backend/AgendaConsultas.Api -> API
-- backend/AgendaConsultas.Tests -> testes unitarios
-- frontend -> pagina web
-- docker-compose.yml -> MongoDB local
+- `backend/AgendaConsultas.Api`: API e frontend estatico
+- `backend/AgendaConsultas.Tests`: testes unitarios de services
+- `frontend`: arquivos do front (`index.html`, `app.js`, `styles.css`)
+- `docker-compose.yml`: MongoDB local
+- `SOLID.md`: resumo de aplicacao de principios SOLID
 
-## Banco de dados (MongoDB)
+## Fluxo funcional atual
 
-- ConnectionString padrao: mongodb://localhost:27017
-- DatabaseName padrao: AgendaConsultasDb
-- Colecoes: pacientes, consultas, usuarios
+### Autenticacao no front
 
-Campos principais:
+- Um formulario unico com dois modos:
+  - `Entrar`: pede `email` e `senha`
+  - `Criar conta`: pede `email`, `senha`, `nome`, `cpf`, `telefone`
+- No cadastro pelo front, o role e sempre `usuario`.
 
-- pacientes: nome, cpf, telefone, email
-- consultas: pacienteId, data (UTC), dataBrasil (-03:00), especialidade, status
-- usuarios: email, role, passwordHash
+### Comportamento por role
+
+- `admin`:
+  - ve todos os pacientes e consultas
+  - cria paciente (com usuario existente ou novo)
+  - cria/remove consultas
+  - lista/remove usuarios
+  - atualiza role de usuario
+- `usuario`:
+  - ve somente o proprio paciente
+  - ve somente as proprias consultas
+  - marca consulta para si na aba `Pacientes`
+  - nao ve formularios/modais administrativos
+
+### Criacao de paciente por admin
+
+No modal `Novo paciente` (aba Pacientes), admin pode:
+
+1. usar email de usuario ja existente (sem senha)
+2. informar email novo + senha (min 6), e a API cria usuario `usuario` e paciente no mesmo fluxo
+
+## Permissoes da API
+
+| Endpoint | Admin | Usuario |
+|---|---|---|
+| `POST /api/auth/register` | sim | sim |
+| `POST /api/auth/login` | sim | sim |
+| `PUT /api/auth/role` | sim | nao |
+| `GET /api/pacientes` | todos | somente o proprio |
+| `GET /api/pacientes/{id}` | sim | somente se for o proprio |
+| `POST /api/pacientes` | sim | sim (email forcado para o proprio token) |
+| `PUT /api/pacientes/{id}` | sim | nao |
+| `DELETE /api/pacientes/{id}` | sim | nao |
+| `GET /api/consultas` | todas | somente as proprias |
+| `GET /api/consultas/paciente/{id}` | sim | somente o proprio paciente |
+| `POST /api/consultas` | sim | sim (somente para si) |
+| `PUT /api/consultas/{id}` | sim | nao |
+| `DELETE /api/consultas/{id}` | sim | nao |
+| `GET /api/consultas/slots` | sim | sim (anonimo tambem) |
+| `GET /api/usuarios` | sim | nao |
+| `DELETE /api/usuarios/{id}` | sim | nao |
+
+## Horarios e fuso
+
+- Horarios padrao: `08:00`, `09:00`, `10:00`, `11:00`, `13:00`, `14:00`, `15:00`, `16:00`, `17:00`.
+- A API recebe horario no contexto Brasil (`America/Sao_Paulo`) e salva em UTC.
+- Campo `dataBrasil` e gerado para exibicao no front.
+- Slots: `GET /api/consultas/slots?date=yyyy-MM-dd`.
 
 ## Requisitos
 
-- .NET SDK 10.0
-- Docker Desktop (para MongoDB)
+- .NET SDK 10
+- Docker Desktop (ou MongoDB local)
 
-## Variaveis de ambiente (opcional)
+## Configuracao
 
-Se quiser sobrescrever valores locais, use:
+`appsettings.json` (padrao):
 
+- `Mongo:ConnectionString = mongodb://localhost:27017`
+- `Mongo:DatabaseName = AgendaConsultasDb`
+- `Jwt:Issuer = AgendaConsultas.Api`
+- `Jwt:Audience = AgendaConsultas.Api`
+- `Jwt:ExpirationMinutes = 60`
+
+Em desenvolvimento, a chave JWT padrao vem em `appsettings.Development.json`.
+Em ambientes reais, use variavel de ambiente:
+
+```powershell
+$env:Jwt__Key="sua-chave-com-32-ou-mais-caracteres"
 ```
-$env:Mongo__ConnectionString="mongodb://localhost:27017"
-$env:Mongo__DatabaseName="AgendaConsultasDb"
-$env:Jwt__Key="super-secret-key-32-chars-minimum!!"
-$env:Jwt__Issuer="AgendaConsultas.Api"
-$env:Jwt__Audience="AgendaConsultas.Api"
-$env:Jwt__ExpirationMinutes="60"
-```
 
-Observacao: a chave JWT precisa ter 32+ caracteres.
+## Como rodar
 
-## Passo a passo
+1. Suba o MongoDB:
 
-1) Suba o MongoDB:
-
-```
+```powershell
 docker-compose up -d
 ```
 
-2) Rode a API:
+2. Rode a API:
 
-```
+```powershell
 dotnet run --project backend/AgendaConsultas.Api
 ```
 
-3) Acesse:
+3. Abra:
 
-- Swagger: http://localhost:5000/swagger
-- Frontend: http://localhost:5000/
+- Frontend: `http://localhost:5000/`
+- Swagger: `http://localhost:5000/swagger` (Development)
 
-## Fluxo rapido (Postman)
+## Exemplos de payload
 
-Base URL:
+### Register de usuario (front)
 
-```
-http://localhost:5000
-```
+`POST /api/auth/register`
 
-1) Registrar admin
-
-POST /api/auth/register
-
-```
+```json
 {
-	"email": "admin@email.com",
-	"password": "123456",
-	"role": "admin"
+  "email": "usuario@email.com",
+  "password": "123456",
+  "role": "usuario",
+  "nome": "Ana Silva",
+  "cpf": "12345678901",
+  "telefone": "11999999999"
 }
 ```
 
-2) Login
+### Login
 
-POST /api/auth/login
+`POST /api/auth/login`
 
-```
+```json
 {
-	"email": "admin@email.com",
-	"password": "123456"
+  "email": "usuario@email.com",
+  "password": "123456"
 }
 ```
 
-Guarde o token e use no header:
+### Criar paciente (admin, criando usuario novo junto)
 
-```
-Authorization: Bearer <TOKEN>
-```
+`POST /api/pacientes`
 
-3) Criar paciente
-
-POST /api/pacientes
-
-```
+```json
 {
-	"nome": "Ana Silva",
-	"cpf": "12345678901",
-	"telefone": "11999999999",
-	"email": "ana@email.com"
+  "nome": "Carlos Pereira",
+  "cpf": "98765432100",
+  "telefone": "11988887777",
+  "email": "carlos@email.com",
+  "password": "123456"
 }
 ```
 
-4) Criar consulta
+### Criar consulta
 
-POST /api/consultas
+`POST /api/consultas`
 
-```
+```json
 {
-	"pacienteId": "<ID_PACIENTE>",
-	"data": "2026-05-28T14:00:00Z",
-	"especialidade": "clinico",
-	"status": "agendada"
+  "pacienteId": "ID_DO_PACIENTE",
+  "data": "2026-06-01T08:00:00",
+  "especialidade": "clinico",
+  "status": "agendada"
 }
 ```
-
-## Endpoints principais
-
-- /api/pacientes (CRUD completo)
-- /api/consultas (CRUD completo)
-- /api/consultas/slots (horarios disponiveis)
-- /api/auth/register
-- /api/auth/login
-- /api/auth/role (admin)
-- /api/usuarios (admin)
-
-## Regras de acesso
-
-- Update e delete exigem role admin.
-- Depois de atualizar role, o usuario deve fazer login novamente.
-- Usuarios nao admin so veem consultas do paciente com o mesmo email do login.
-- Consultas so podem ser marcadas em horarios padronizados.
-- Use /api/consultas/slots?date=yyyy-MM-dd para ver horarios disponiveis (date e opcional).
-- O endpoint de slots pode ser acessado sem login.
-
-## Horarios e fuso (Brasil)
-
-- A UI trabalha com horario do Brasil.
-- O banco salva a data em UTC no campo data.
-- A API gera dataBrasil com offset -03:00 para exibicao no frontend.
-
-## Postman (lista completa)
-
-### Auth - Register
-
-- Metodo: POST
-- URL: /api/auth/register
-
-```
-{
-	"email": "admin@email.com",
-	"password": "123456",
-	"role": "admin"
-}
-```
-
-### Auth - Login
-
-- Metodo: POST
-- URL: /api/auth/login
-
-```
-{
-	"email": "admin@email.com",
-	"password": "123456"
-}
-```
-
-### Pacientes - Criar
-
-- Metodo: POST
-- URL: /api/pacientes
-
-```
-{
-	"nome": "Ana Silva",
-	"cpf": "12345678901",
-	"telefone": "11999999999",
-	"email": "ana@email.com"
-}
-```
-
-### Pacientes - Listar
-
-- Metodo: GET
-- URL: /api/pacientes
-
-### Pacientes - Atualizar (admin)
-
-- Metodo: PUT
-- URL: /api/pacientes/{id}
-- Header: Authorization: Bearer <TOKEN>
-
-```
-{
-	"nome": "Ana Silva",
-	"cpf": "12345678901",
-	"telefone": "11999999999",
-	"email": "ana@email.com"
-}
-```
-
-### Pacientes - Deletar (admin)
-
-- Metodo: DELETE
-- URL: /api/pacientes/{id}
-- Header: Authorization: Bearer <TOKEN>
-
-### Consultas - Criar
-
-- Metodo: POST
-- URL: /api/consultas
-
-```
-{
-	"pacienteId": "<ID_PACIENTE>",
-	"data": "2026-06-01T08:00:00",
-	"especialidade": "clinico",
-	"status": "agendada"
-}
-```
-
-### Consultas - Listar por paciente
-
-- Metodo: GET
-- URL: /api/consultas/paciente/{pacienteId}
-
-### Consultas - Listar todas (admin)
-
-- Metodo: GET
-- URL: /api/consultas
-
-### Consultas - Horarios disponiveis
-
-- Metodo: GET
-- URL: /api/consultas/slots?date=yyyy-MM-dd
-
-### Consultas - Atualizar (admin)
-
-- Metodo: PUT
-- URL: /api/consultas/{id}
-- Header: Authorization: Bearer <TOKEN>
-
-```
-{
-	"pacienteId": "<ID_PACIENTE>",
-	"data": "2026-06-01T08:00:00",
-	"especialidade": "clinico",
-	"status": "concluida"
-}
-```
-
-### Consultas - Deletar (admin)
-
-- Metodo: DELETE
-- URL: /api/consultas/{id}
-- Header: Authorization: Bearer <TOKEN>
-
-### Usuarios - Atualizar role (admin)
-
-- Metodo: PUT
-- URL: /api/auth/role
-- Header: Authorization: Bearer <TOKEN>
-
-```
-{
-	"email": "usuario@email.com",
-	"role": "admin"
-}
-```
-
-### Usuarios - Listar (admin)
-
-- Metodo: GET
-- URL: /api/usuarios
-- Header: Authorization: Bearer <TOKEN>
-
-### Usuarios - Deletar (admin)
-
-- Metodo: DELETE
-- URL: /api/usuarios/{id}
-- Header: Authorization: Bearer <TOKEN>
 
 ## Testes
 
-```
+Rodar tudo:
+
+```powershell
 dotnet test AgendaConsultas.slnx
 ```
 
-Detalhes dos testes:
+Somente testes unitarios:
 
-- backend/AgendaConsultas.Tests/README.md
+```powershell
+dotnet test backend/AgendaConsultas.Tests
+```
 
-## Problemas comuns
+Mais detalhes: `backend/AgendaConsultas.Tests/README.md`.
 
-- 415: verifique Content-Type = application/json no Postman.
-- 401: token ausente ou gerado antes de trocar a chave JWT.
-- 400: valide CPF (11 digitos) e email valido.
+## Erros comuns
+
+- `400 Bad Request`:
+  - cadastro sem `nome/cpf/telefone` para role `usuario`
+  - CPF ou telefone fora do formato esperado
+  - criacao de paciente com email novo sem senha
+  - horario de consulta fora dos horarios padrao
+- `401 Unauthorized`: token ausente, invalido ou expirado
+- `403 Forbidden`: usuario tentando acessar dados de outro paciente

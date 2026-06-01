@@ -1,55 +1,54 @@
 # AgendaConsultas.Tests
 
-Este projeto contem testes unitarios da camada de servicos da API. Ele nao usa MongoDB, pois os repositorios sao simulados em memoria para testar apenas as regras de negocio.
+Testes unitarios da camada de servicos da API, focados em regra de negocio.
+Nao usa MongoDB real: repositorios sao simulados em memoria.
 
-## O que e testado
+## Escopo coberto
 
-PacienteService
+### `PacienteService`
 
 - cria paciente com dados validos
-- falha ao criar paciente com email invalido
-- falha ao criar paciente com email duplicado
-- falha ao criar paciente com CPF duplicado
-- falha ao atualizar paciente inexistente
-- falha ao remover paciente inexistente
-- atualiza dados do paciente
+- bloqueia email invalido
+- bloqueia email duplicado
+- bloqueia CPF duplicado
+- bloqueia update de paciente inexistente
+- bloqueia delete de paciente inexistente
+- atualiza paciente existente
 
-ConsultaService
+### `ConsultaService`
 
 - cria consulta para paciente existente
-- falha ao criar consulta quando o paciente nao existe
-- falha ao criar consulta fora do horario padrao
-- falha ao criar consulta quando o horario ja esta ocupado
-- permite criar consulta quando a anterior esta cancelada
-- preenche campo dataBrasil (horario do Brasil)
-- marca horarios ocupados no endpoint de slots
+- bloqueia criacao sem paciente valido
+- bloqueia horario fora do padrao
+- bloqueia horario ja ocupado
+- permite horario quando consulta anterior esta cancelada
+- preenche `dataBrasil` no formato esperado
+- marca slots ocupados na consulta de disponibilidade
 
-## Como funciona
+## Estrategia dos testes
 
-1) O teste cria repositorios em memoria (listas internas).
-2) O servico recebe esses repositorios via construtor.
-3) O metodo do servico e executado.
-4) O teste valida o resultado ou a excecao esperada.
+1. Arrange: instancia repositorios em memoria e service.
+2. Act: executa o metodo alvo.
+3. Assert: valida retorno ou excecao esperada.
 
-Arquivo principal:
+Arquivo principal: `UnitTest1.cs`.
 
-- UnitTest1.cs: testes e repositorios em memoria.
+## Observacoes importantes
 
-## Observacoes
-
-- Horarios padronizados usam o fuso do Brasil e sao validados no service.
-- O banco armazena data em UTC, mas a API gera dataBrasil com offset -03:00.
+- Horarios seguem o fuso do Brasil (`America/Sao_Paulo` / `E. South America Standard Time`).
+- Persistencia de `data` ocorre em UTC.
+- `dataBrasil` e campo auxiliar de exibicao.
 
 ## Como executar
 
 Na raiz do repositorio:
 
-```
+```powershell
 dotnet test AgendaConsultas.slnx
 ```
 
-Somente os testes:
+Somente este projeto:
 
-```
+```powershell
 dotnet test backend/AgendaConsultas.Tests
 ```

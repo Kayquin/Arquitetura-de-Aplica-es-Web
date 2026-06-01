@@ -160,6 +160,26 @@ public class ConsultasController : ControllerBase
     {
         try
         {
+            if (!User.IsInRole("admin"))
+            {
+                var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.Name);
+                if (string.IsNullOrWhiteSpace(email))
+                {
+                    return Unauthorized();
+                }
+
+                var paciente = await _pacienteRepository.GetByIdAsync(dto.PacienteId);
+                if (paciente is null)
+                {
+                    return NotFound(new { message = "Paciente not found" });
+                }
+
+                if (!string.Equals(paciente.Email, email, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Forbid();
+                }
+            }
+
             // Service valida horario e conflito.
             var consulta = await _service.CreateAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id = consulta.Id }, consulta);

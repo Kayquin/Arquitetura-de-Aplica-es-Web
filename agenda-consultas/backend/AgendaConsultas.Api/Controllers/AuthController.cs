@@ -23,9 +23,12 @@ public class AuthController : ControllerBase
     /// <remarks>
     /// Exemplo:
     /// {
-    ///   "email": "admin@email.com",
+    ///   "email": "usuario@email.com",
     ///   "password": "123456",
-    ///   "role": "admin"
+    ///   "role": "usuario",
+    ///   "nome": "Ana Silva",
+    ///   "cpf": "12345678901",
+    ///   "telefone": "11999999999"
     /// }
     /// </remarks>
     [HttpPost("register")]

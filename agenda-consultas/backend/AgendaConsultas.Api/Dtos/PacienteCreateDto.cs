@@ -25,4 +25,7 @@ public class PacienteCreateDto
     [EmailAddress]
     // Email para contato.
     public string Email { get; set; } = string.Empty;
+
+    // Senha opcional para criacao automatica do usuario (fluxo admin).
+    public string Password { get; set; } = string.Empty;
 }

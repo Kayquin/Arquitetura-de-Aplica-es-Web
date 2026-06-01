@@ -10,6 +10,8 @@ public interface IPacienteService
     Task<List<Paciente>> GetAllAsync();
     // Busca paciente por id.
     Task<Paciente> GetByIdAsync(string id);
+    // Busca paciente por email.
+    Task<Paciente?> GetByEmailAsync(string email);
     // Cria paciente com validacoes.
     Task<Paciente> CreateAsync(PacienteCreateDto dto);
     // Atualiza paciente por id.

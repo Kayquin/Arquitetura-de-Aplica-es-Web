@@ -1,3 +1,4 @@
+// Referencias dos elementos da UI.
 const apiBaseInput = document.getElementById("apiBase");
 const saveApiBaseButton = document.getElementById("saveApiBase");
 const authStatus = document.getElementById("authStatus");
@@ -14,24 +15,83 @@ const navUsuarios = document.getElementById("navUsuarios");
 const navConfig = document.getElementById("navConfig");
 const pacienteCpfInput = document.getElementById("pacienteCpf");
 const pacienteTelefoneInput = document.getElementById("pacienteTelefone");
+const pacienteEmailInput = document.getElementById("pacienteEmail");
+const pacientePasswordInput = document.getElementById("pacientePassword");
+const pacienteUsuarioGroup = document.getElementById("pacienteUsuarioGroup");
+const pacienteUsuarioSelect = document.getElementById("pacienteUsuario");
+const pacienteConsultaForm = document.getElementById("pacienteConsultaForm");
+const pacienteConsultaSelecionado = document.getElementById("pacienteConsultaSelecionado");
+const pacienteConsultaDataInput = document.getElementById("pacienteConsultaData");
+const pacienteConsultaHorarioSelect = document.getElementById("pacienteConsultaHorario");
+const pacienteConsultaEspecialidadeInput = document.getElementById("pacienteConsultaEspecialidade");
+const pacienteForm = document.getElementById("pacienteForm");
+const consultaForm = document.getElementById("consultaForm");
+const pacienteAdminActions = document.getElementById("pacienteAdminActions");
+const consultaAdminActions = document.getElementById("consultaAdminActions");
+const usuarioAdminActions = document.getElementById("usuarioAdminActions");
+const openPacienteModalButton = document.getElementById("openPacienteModal");
+const openConsultaModalButton = document.getElementById("openConsultaModal");
+const openRoleModalButton = document.getElementById("openRoleModal");
+const pacienteModal = document.getElementById("pacienteModal");
+const consultaModal = document.getElementById("consultaModal");
+const roleModal = document.getElementById("roleModal");
 const roleForm = document.getElementById("roleForm");
 const roleEmailInput = document.getElementById("roleEmail");
 const roleValueInput = document.getElementById("roleValue");
 const consultaDataInput = document.getElementById("consultaData");
 const consultaHorarioSelect = document.getElementById("consultaHorario");
+const consultaEspecialidadeInput = document.getElementById("consultaEspecialidade");
+const consultaStatusInput = document.getElementById("consultaStatus");
+const authForm = document.getElementById("authForm");
+const authFormTitle = document.getElementById("authFormTitle");
+const authStepHint = document.getElementById("authStepHint");
+const authModeInfo = document.getElementById("authModeInfo");
+const authEmailInput = document.getElementById("authEmail");
+const authPasswordInput = document.getElementById("authPassword");
+const authSubmitButton = document.getElementById("authSubmit");
+const modeLoginButton = document.getElementById("modeLogin");
+const modeRegisterButton = document.getElementById("modeRegister");
+const legacyRegisterForm = document.getElementById("registerForm");
+const legacyLoginForm = document.getElementById("loginForm");
 
+// Estado da aplicacao em memoria.
 let apiBase = apiBaseInput.value.trim();
 let token = localStorage.getItem("jwtToken") || "";
 let selectedPaciente = null;
 let currentRole = "";
 let currentEmail = "";
 let pacientesById = new Map();
+let authMode = "login";
+let activeModalId = "";
+let statusTimerId = null;
+let authRegisterFields = null;
+let authNomeInput = null;
+let authCpfInput = null;
+let authTelefoneInput = null;
+const pacienteConsultaParent = pacienteConsultaForm ? pacienteConsultaForm.parentElement : null;
 
-function setStatus(message, isError = false) {
+// Atualiza mensagem de status no rodape.
+function setStatus(message, isError = false, autoClearMs = 5000) {
+  if (statusTimerId) {
+    clearTimeout(statusTimerId);
+    statusTimerId = null;
+  }
+
   statusMessage.textContent = message;
   statusMessage.style.color = isError ? "#b91c1c" : "#2563eb";
+
+  if (!message || autoClearMs <= 0) {
+    return;
+  }
+
+  statusTimerId = setTimeout(() => {
+    statusMessage.textContent = "";
+    statusMessage.style.color = "";
+    statusTimerId = null;
+  }, autoClearMs);
 }
 
+// Mostra quem esta logado no card de status.
 function updateAuthStatus() {
   if (!token) {
     authStatus.textContent = "Sem login";
@@ -43,6 +103,7 @@ function updateAuthStatus() {
   authStatus.textContent = `${emailText}${roleText}`;
 }
 
+// Alterna entre as views principais.
 function setView(view) {
   const target = document.getElementById(`view-${view}`);
   if (!target || target.hidden) {
@@ -58,19 +119,26 @@ function setView(view) {
 
   if (view === "pacientes") {
     loadPacientes();
+    loadUsuarioOptionsForPaciente();
+    loadHorariosPacienteUsuario();
   }
   if (view === "consultas") {
     if (!selectedPaciente && currentRole === "admin") {
       pacienteSelecionado.textContent = "Todas as consultas";
+    } else if (currentRole !== "admin") {
+      pacienteSelecionado.textContent = "Minhas consultas";
     }
     loadConsultas();
-    loadHorarios();
+    if (currentRole === "admin") {
+      loadHorarios();
+    }
   }
   if (view === "usuarios") {
     loadUsuarios();
   }
 }
 
+// Faz parse do JWT para extrair claims.
 function parseJwt(tokenValue) {
   try {
     const payload = tokenValue.split(".")[1];
@@ -86,6 +154,7 @@ function parseJwt(tokenValue) {
   }
 }
 
+// Atualiza email/role a partir do token atual.
 function syncAuthFromToken() {
   currentRole = "";
   currentEmail = "";
@@ -108,11 +177,14 @@ function syncAuthFromToken() {
     payload.role ||
     payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ||
     "";
+  currentRole = currentRole.trim().toLowerCase();
 }
 
+// Ajusta visibilidade e permissoes do menu.
 function applyAccessControl() {
   const isLogged = Boolean(token);
   const isAdmin = currentRole === "admin";
+  const isUsuario = currentRole === "usuario";
 
   navPacientes.hidden = !isLogged;
   navConsultas.hidden = !isLogged;
@@ -120,7 +192,29 @@ function applyAccessControl() {
   navConfig.hidden = !isAdmin;
 
   navPacientes.disabled = !isLogged;
-  navConsultas.disabled = !isLogged || (!selectedPaciente && !isAdmin);
+  navConsultas.disabled = !isLogged || (isAdmin && !selectedPaciente);
+
+  if (pacienteUsuarioGroup) {
+    pacienteUsuarioGroup.hidden = !isAdmin;
+  }
+  if (pacienteAdminActions) {
+    pacienteAdminActions.hidden = !isAdmin;
+  }
+  if (consultaAdminActions) {
+    consultaAdminActions.hidden = !isAdmin;
+  }
+  if (usuarioAdminActions) {
+    usuarioAdminActions.hidden = !isAdmin;
+  }
+  ensurePacienteConsultaMounted(isLogged && isUsuario);
+  if (pacienteEmailInput) {
+    if (isLogged && !isAdmin) {
+      pacienteEmailInput.value = currentEmail;
+      pacienteEmailInput.readOnly = true;
+    } else {
+      pacienteEmailInput.readOnly = false;
+    }
+  }
 
   document.getElementById("view-pacientes").hidden = !isLogged;
   document.getElementById("view-consultas").hidden = !isLogged;
@@ -128,12 +222,201 @@ function applyAccessControl() {
   document.getElementById("view-config").hidden = !isAdmin;
 
   if (!isLogged) {
+    closeModal("pacienteModal");
+    closeModal("consultaModal");
+    closeModal("roleModal");
     setView("auth");
   } else if (document.getElementById("view-auth").classList.contains("active")) {
     setView("pacientes");
   }
+
+  if (!isAdmin) {
+    closeModal("pacienteModal");
+    closeModal("consultaModal");
+    closeModal("roleModal");
+  }
 }
 
+function openModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) {
+    return;
+  }
+  modal.hidden = false;
+  activeModalId = modalId;
+}
+
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) {
+    return;
+  }
+  modal.hidden = true;
+  if (activeModalId === modalId) {
+    activeModalId = "";
+  }
+}
+
+function todayIsoDate() {
+  const hoje = new Date();
+  const local = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function ensureConsultaDateValue() {
+  if (!consultaDataInput) {
+    return;
+  }
+  if (!consultaDataInput.value) {
+    consultaDataInput.value = todayIsoDate();
+  }
+}
+
+function ensurePacienteConsultaMounted(shouldMount) {
+  if (!pacienteConsultaForm || !pacienteConsultaParent) {
+    return;
+  }
+
+  if (shouldMount) {
+    if (!pacienteConsultaForm.isConnected) {
+      if (pacienteAdminActions && pacienteAdminActions.parentElement === pacienteConsultaParent) {
+        pacienteConsultaParent.insertBefore(pacienteConsultaForm, pacienteAdminActions);
+      } else {
+        pacienteConsultaParent.appendChild(pacienteConsultaForm);
+      }
+    }
+    return;
+  }
+
+  if (pacienteConsultaForm.isConnected) {
+    pacienteConsultaForm.remove();
+  }
+}
+
+function ensureRegisterFieldsMounted() {
+  if (!authForm || !authSubmitButton || authRegisterFields) {
+    return;
+  }
+
+  authRegisterFields = document.createElement("div");
+  authRegisterFields.id = "authRegisterFields";
+  authRegisterFields.className = "field-group";
+
+  authNomeInput = document.createElement("input");
+  authNomeInput.id = "authNome";
+  authNomeInput.type = "text";
+  authNomeInput.placeholder = "Nome completo";
+
+  authCpfInput = document.createElement("input");
+  authCpfInput.id = "authCpf";
+  authCpfInput.type = "text";
+  authCpfInput.placeholder = "CPF";
+  authCpfInput.addEventListener("input", event => {
+    event.target.value = formatCpf(event.target.value);
+  });
+
+  authTelefoneInput = document.createElement("input");
+  authTelefoneInput.id = "authTelefone";
+  authTelefoneInput.type = "text";
+  authTelefoneInput.placeholder = "Telefone";
+  authTelefoneInput.addEventListener("input", event => {
+    event.target.value = formatPhone(event.target.value);
+  });
+
+  authRegisterFields.appendChild(authNomeInput);
+  authRegisterFields.appendChild(authCpfInput);
+  authRegisterFields.appendChild(authTelefoneInput);
+  authForm.insertBefore(authRegisterFields, authSubmitButton);
+}
+
+function removeRegisterFieldsMounted() {
+  if (authRegisterFields && authRegisterFields.parentElement) {
+    authRegisterFields.parentElement.removeChild(authRegisterFields);
+  }
+  authRegisterFields = null;
+  authNomeInput = null;
+  authCpfInput = null;
+  authTelefoneInput = null;
+}
+
+// Carrega usuarios para facilitar vinculacao ao criar paciente (admin).
+async function loadUsuarioOptionsForPaciente() {
+  if (!pacienteUsuarioSelect || currentRole !== "admin" || !token) {
+    return;
+  }
+
+  try {
+    const usuarios = await apiFetch("/api/usuarios");
+    const previousValue = pacienteUsuarioSelect.value;
+    pacienteUsuarioSelect.innerHTML = "";
+
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "Selecione um usuario cadastrado";
+    pacienteUsuarioSelect.appendChild(defaultOption);
+
+    usuarios
+      .filter(usuario => usuario.email)
+      .forEach(usuario => {
+        const option = document.createElement("option");
+        option.value = usuario.email.toLowerCase();
+        option.textContent = `${usuario.email} (${usuario.role})`;
+        if (option.value === previousValue) {
+          option.selected = true;
+        }
+        pacienteUsuarioSelect.appendChild(option);
+      });
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+// Atualiza o formulario unico entre login e cadastro.
+function setAuthMode(mode) {
+  if (
+    !modeLoginButton ||
+    !modeRegisterButton ||
+    !authFormTitle ||
+    !authStepHint ||
+    !authSubmitButton ||
+    !authPasswordInput
+  ) {
+    return;
+  }
+
+  authMode = mode === "register" ? "register" : "login";
+  const isRegister = authMode === "register";
+  if (authForm) {
+    authForm.dataset.mode = isRegister ? "register" : "login";
+  }
+
+  modeLoginButton.classList.toggle("active", !isRegister);
+  modeRegisterButton.classList.toggle("active", isRegister);
+  modeLoginButton.setAttribute("aria-pressed", String(!isRegister));
+  modeRegisterButton.setAttribute("aria-pressed", String(isRegister));
+  authFormTitle.textContent = `Etapa 1: ${isRegister ? "criar conta" : "entrar"}`;
+  authStepHint.textContent = isRegister
+    ? "Etapa 2: informe dados da conta e do paciente."
+    : "Etapa 2: informe email e senha para entrar.";
+  if (authModeInfo) {
+    authModeInfo.textContent = isRegister
+      ? "Modo criar conta: cria usuario e paciente automaticamente."
+      : "Modo login: acesso rapido.";
+  }
+  authSubmitButton.textContent = isRegister ? "Criar conta" : "Entrar";
+  authPasswordInput.minLength = isRegister ? 6 : 0;
+
+  if (isRegister) {
+    ensureRegisterFieldsMounted();
+    if (authNomeInput) authNomeInput.required = true;
+    if (authCpfInput) authCpfInput.required = true;
+    if (authTelefoneInput) authTelefoneInput.required = true;
+  } else {
+    removeRegisterFieldsMounted();
+  }
+}
+
+// Helpers de formatacao de entradas.
 function onlyDigits(value, maxLength) {
   // Mantem apenas digitos para validar no backend.
   const digits = value.replace(/\D/g, "");
@@ -166,6 +449,7 @@ function formatPhone(value) {
   return `(${ddd}) ${part1}-${part2}`;
 }
 
+// Exibe apenas HH:mm do ISO.
 function formatHorarioLabel(isoDate) {
   if (!isoDate || isoDate.length < 16) {
     return "";
@@ -173,6 +457,7 @@ function formatHorarioLabel(isoDate) {
   return isoDate.slice(11, 16);
 }
 
+// Formata data exibida na lista de consultas.
 function formatConsultaDate(consulta) {
   const valor = consulta.dataBrasil || consulta.data;
   if (!valor) {
@@ -189,15 +474,25 @@ function formatConsultaDate(consulta) {
   }).format(data);
 }
 
+// Renderiza select de horarios padronizados.
 function renderHorarios(slots) {
-  consultaHorarioSelect.innerHTML = "";
+  renderHorariosInSelect(consultaHorarioSelect, slots);
+}
+
+// Renderiza horarios em qualquer select de consulta.
+function renderHorariosInSelect(selectEl, slots) {
+  if (!selectEl) {
+    return;
+  }
+
+  selectEl.innerHTML = "";
   if (!slots || slots.length === 0) {
     const option = document.createElement("option");
     option.value = "";
     option.textContent = "Sem horarios para o dia";
     option.disabled = true;
     option.selected = true;
-    consultaHorarioSelect.appendChild(option);
+    selectEl.appendChild(option);
     return;
   }
 
@@ -214,10 +509,11 @@ function renderHorarios(slots) {
       option.selected = true;
       selecionado = true;
     }
-    consultaHorarioSelect.appendChild(option);
+    selectEl.appendChild(option);
   });
 }
 
+// Normaliza mensagens de erro da API.
 function extractErrorMessage(data) {
   if (!data || typeof data !== "object") {
     return null;
@@ -239,6 +535,7 @@ function extractErrorMessage(data) {
   return null;
 }
 
+// Fetch centralizado com JWT e tratamento de erros.
 async function apiFetch(path, options = {}) {
   // Fetch centralizado com JSON e JWT.
   const headers = options.headers || {};
@@ -285,23 +582,46 @@ async function apiFetch(path, options = {}) {
   return response.json();
 }
 
+// Carrega lista de pacientes e atualiza cache por id.
 async function loadPacientes() {
   if (!token) {
     setStatus("Faca login para ver pacientes", true);
     return;
   }
   try {
+    pacienteList.innerHTML = "";
     const pacientes = await apiFetch("/api/pacientes");
+    const isAdmin = currentRole === "admin";
+
+    if (!isAdmin) {
+      selectedPaciente = pacientes.length > 0 ? pacientes[0] : null;
+      if (selectedPaciente) {
+        pacienteSelecionado.textContent = `Paciente: ${selectedPaciente.nome}`;
+        if (pacienteConsultaSelecionado) {
+          pacienteConsultaSelecionado.textContent = `Paciente: ${selectedPaciente.nome}`;
+        }
+        navConsultas.disabled = false;
+        loadHorariosPacienteUsuario();
+      } else {
+        pacienteSelecionado.textContent = "Cadastre seu paciente para marcar consulta";
+        if (pacienteConsultaSelecionado) {
+          pacienteConsultaSelecionado.textContent = "Cadastre seu paciente para marcar consulta";
+        }
+        navConsultas.disabled = true;
+      }
+    }
+
     pacientesById = new Map(pacientes.map(paciente => [paciente.id, paciente]));
     pacienteList.innerHTML = "";
     pacientes.forEach(paciente => {
+      const actionLabel = isAdmin ? "Ver consultas" : "Selecionar para marcar";
       const li = document.createElement("li");
       li.innerHTML = `
         <strong>${paciente.nome}</strong>
         <span>${paciente.email}</span>
         <span>${paciente.telefone}</span>
         <div class="actions">
-          <button data-id="${paciente.id}">Ver consultas</button>
+          <button data-id="${paciente.id}">${actionLabel}</button>
         </div>
       `;
       li.querySelector("button").addEventListener("click", () => {
@@ -310,10 +630,12 @@ async function loadPacientes() {
       pacienteList.appendChild(li);
     });
   } catch (error) {
+    pacienteList.innerHTML = "";
     setStatus(error.message, true);
   }
 }
 
+// Carrega consultas do paciente selecionado ou todas (admin).
 async function loadConsultas() {
   if (!token) {
     setStatus("Faca login para ver consultas", true);
@@ -322,52 +644,58 @@ async function loadConsultas() {
 
   try {
     const isAdmin = currentRole === "admin";
+    consultaList.innerHTML = "";
     if (!selectedPaciente && isAdmin && pacientesById.size === 0) {
       const pacientes = await apiFetch("/api/pacientes");
       pacientesById = new Map(pacientes.map(paciente => [paciente.id, paciente]));
     }
-    const endpoint = selectedPaciente
-      ? `/api/consultas/paciente/${selectedPaciente.id}`
-      : isAdmin
-        ? "/api/consultas"
-        : null;
+
+    // Usuario comum sempre consulta pelo proprio token (evita pacienteId antigo em memoria).
+    const endpoint = isAdmin
+      ? (selectedPaciente ? `/api/consultas/paciente/${selectedPaciente.id}` : "/api/consultas")
+      : "/api/consultas";
+
     if (!endpoint) {
       return;
     }
 
     const consultas = await apiFetch(endpoint);
-    consultaList.innerHTML = "";
     consultas.forEach(consulta => {
       const li = document.createElement("li");
       const dataFormatada = formatConsultaDate(consulta);
       const pacienteNome = !selectedPaciente
         ? (pacientesById.get(consulta.pacienteId)?.nome || consulta.pacienteId)
         : "";
+      const actionHtml = isAdmin
+        ? `<div class="actions"><button data-id="${consulta.id}">Excluir</button></div>`
+        : "";
       li.innerHTML = `
         <strong>${consulta.especialidade}</strong>
         <span>${dataFormatada}</span>
         <span>Status: ${consulta.status}</span>
         ${selectedPaciente ? "" : `<span>Paciente: ${pacienteNome}</span>`}
-        <div class="actions">
-          <button data-id="${consulta.id}">Excluir</button>
-        </div>
+        ${actionHtml}
       `;
-      li.querySelector("button").addEventListener("click", async () => {
-        try {
-          await apiFetch(`/api/consultas/${consulta.id}`, { method: "DELETE" });
-          setStatus("Consulta removida");
-          await loadConsultas();
-        } catch (error) {
-          setStatus(error.message, true);
-        }
-      });
+      if (isAdmin) {
+        li.querySelector("button").addEventListener("click", async () => {
+          try {
+            await apiFetch(`/api/consultas/${consulta.id}`, { method: "DELETE" });
+            setStatus("Consulta removida");
+            await loadConsultas();
+          } catch (error) {
+            setStatus(error.message, true);
+          }
+        });
+      }
       consultaList.appendChild(li);
     });
   } catch (error) {
+    consultaList.innerHTML = "";
     setStatus(error.message, true);
   }
 }
 
+// Carrega horarios disponiveis do dia.
 async function loadHorarios() {
   if (!token) {
     setStatus("Faca login para ver consultas", true);
@@ -390,15 +718,41 @@ async function loadHorarios() {
   }
 }
 
+// Seleciona paciente e abre a view de consultas.
 function selectPaciente(paciente) {
   selectedPaciente = paciente;
   pacienteSelecionado.textContent = `Paciente: ${paciente.nome}`;
+  if (pacienteConsultaSelecionado) {
+    pacienteConsultaSelecionado.textContent = `Paciente: ${paciente.nome}`;
+  }
   navConsultas.disabled = false;
-  setView("consultas");
-  loadConsultas();
-  loadHorarios();
+  if (currentRole === "admin") {
+    setView("consultas");
+    return;
+  }
+
+  loadHorariosPacienteUsuario();
 }
 
+// Carrega horarios para o formulario de marcacao na aba de pacientes (usuario).
+async function loadHorariosPacienteUsuario() {
+  if (!token || currentRole === "admin" || !selectedPaciente || !pacienteConsultaDataInput) {
+    return;
+  }
+
+  if (!pacienteConsultaDataInput.value) {
+    return;
+  }
+
+  try {
+    const slots = await apiFetch(`/api/consultas/slots?date=${encodeURIComponent(pacienteConsultaDataInput.value)}`);
+    renderHorariosInSelect(pacienteConsultaHorarioSelect, slots);
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+// Carrega usuarios (admin).
 async function loadUsuarios() {
   if (!token) {
     setStatus("Faca login para ver usuarios", true);
@@ -434,19 +788,101 @@ async function loadUsuarios() {
   }
 }
 
+// Acao para salvar a API base.
 saveApiBaseButton.addEventListener("click", () => {
   apiBase = apiBaseInput.value.trim();
   setStatus("API base atualizada");
 });
 
-pacienteCpfInput.addEventListener("input", event => {
-  event.target.value = formatCpf(event.target.value);
+if (pacienteCpfInput) {
+  pacienteCpfInput.addEventListener("input", event => {
+    event.target.value = formatCpf(event.target.value);
+  });
+}
+
+if (pacienteTelefoneInput) {
+  pacienteTelefoneInput.addEventListener("input", event => {
+    event.target.value = formatPhone(event.target.value);
+  });
+}
+
+if (pacienteUsuarioSelect) {
+  pacienteUsuarioSelect.addEventListener("change", event => {
+    const email = event.target.value;
+    if (!pacienteEmailInput) {
+      return;
+    }
+
+    if (email) {
+      pacienteEmailInput.value = email;
+      pacienteEmailInput.readOnly = true;
+      if (pacientePasswordInput) {
+        pacientePasswordInput.value = "";
+        pacientePasswordInput.disabled = true;
+      }
+      return;
+    }
+
+    if (currentRole === "admin") {
+      pacienteEmailInput.readOnly = false;
+      pacienteEmailInput.value = "";
+      if (pacientePasswordInput) {
+        pacientePasswordInput.disabled = false;
+      }
+    }
+  });
+}
+
+if (openPacienteModalButton) {
+  openPacienteModalButton.addEventListener("click", async () => {
+    if (pacienteForm) {
+      pacienteForm.reset();
+    }
+    if (pacienteEmailInput) {
+      pacienteEmailInput.readOnly = false;
+      pacienteEmailInput.value = "";
+    }
+    if (pacientePasswordInput) {
+      pacientePasswordInput.disabled = false;
+      pacientePasswordInput.value = "";
+    }
+    await loadUsuarioOptionsForPaciente();
+    openModal("pacienteModal");
+  });
+}
+
+if (openConsultaModalButton) {
+  openConsultaModalButton.addEventListener("click", async () => {
+    if (!selectedPaciente) {
+      setStatus("Selecione um paciente antes de marcar consulta", true);
+      return;
+    }
+    if (consultaForm) {
+      consultaForm.reset();
+    }
+    ensureConsultaDateValue();
+    await loadHorarios();
+    openModal("consultaModal");
+  });
+}
+
+if (openRoleModalButton) {
+  openRoleModalButton.addEventListener("click", () => openModal("roleModal"));
+}
+
+document.querySelectorAll("[data-close-modal]").forEach(button => {
+  button.addEventListener("click", () => {
+    closeModal(button.getAttribute("data-close-modal"));
+  });
 });
 
-pacienteTelefoneInput.addEventListener("input", event => {
-  event.target.value = formatPhone(event.target.value);
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && activeModalId) {
+    closeModal(activeModalId);
+  }
 });
 
+// Troca de abas.
 navButtons.forEach(btn => {
   btn.addEventListener("click", () => {
     if (btn.hidden || btn.disabled) {
@@ -456,56 +892,128 @@ navButtons.forEach(btn => {
   });
 });
 
-const registerForm = document.getElementById("registerForm");
-registerForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  // Normaliza email/role antes de enviar.
-  const body = {
-    email: document.getElementById("regEmail").value.trim().toLowerCase(),
-    password: document.getElementById("regPassword").value,
-    role: document.getElementById("regRole").value.trim().toLowerCase()
-  };
-  try {
-    const response = await apiFetch("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify(body)
-    });
-    token = response.token;
-    localStorage.setItem("jwtToken", token);
-    syncAuthFromToken();
-    updateAuthStatus();
-    applyAccessControl();
-    setView("pacientes");
-    setStatus("Conta criada e logado");
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-});
+if (modeLoginButton) {
+  modeLoginButton.addEventListener("click", () => {
+    setAuthMode("login");
+  });
+}
 
-const loginForm = document.getElementById("loginForm");
-loginForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  const body = {
-    email: document.getElementById("loginEmail").value.trim().toLowerCase(),
-    password: document.getElementById("loginPassword").value
-  };
-  try {
-    const response = await apiFetch("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify(body)
-    });
-    token = response.token;
-    localStorage.setItem("jwtToken", token);
-    syncAuthFromToken();
-    updateAuthStatus();
-    applyAccessControl();
-    setView("pacientes");
-    setStatus("Login realizado");
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-});
+if (modeRegisterButton) {
+  modeRegisterButton.addEventListener("click", () => {
+    setAuthMode("register");
+  });
+}
 
+// Login e cadastro no mesmo formulario.
+if (authForm && authEmailInput && authPasswordInput) {
+  authForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const body = {
+      email: authEmailInput.value.trim().toLowerCase(),
+      password: authPasswordInput.value
+    };
+    const isRegister = authMode === "register";
+    const endpoint = isRegister ? "/api/auth/register" : "/api/auth/login";
+    if (isRegister) {
+      body.role = "usuario";
+      body.nome = authNomeInput ? authNomeInput.value.trim() : "";
+      body.cpf = onlyDigits(authCpfInput ? authCpfInput.value : "", 11);
+      body.telefone = onlyDigits(authTelefoneInput ? authTelefoneInput.value : "", 11);
+    }
+
+    try {
+      const response = await apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      token = response.token;
+      localStorage.setItem("jwtToken", token);
+      // Evita carregar estado da sessao anterior ao trocar usuario.
+      selectedPaciente = null;
+      pacientesById = new Map();
+      pacienteList.innerHTML = "";
+      consultaList.innerHTML = "";
+      usuarioList.innerHTML = "";
+      pacienteSelecionado.textContent = "Selecione um paciente";
+      navConsultas.disabled = true;
+      syncAuthFromToken();
+      updateAuthStatus();
+      applyAccessControl();
+      setView("pacientes");
+      setStatus(isRegister ? "Conta criada e login realizado" : "Login realizado");
+    } catch (error) {
+      setStatus(error.message, true);
+    }
+  });
+} else {
+  // Compatibilidade com layout antigo (formularios separados).
+  if (legacyRegisterForm) {
+    legacyRegisterForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const body = {
+        email: document.getElementById("regEmail")?.value.trim().toLowerCase() || "",
+        password: document.getElementById("regPassword")?.value || "",
+        role: "usuario"
+      };
+      try {
+        const response = await apiFetch("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify(body)
+        });
+        token = response.token;
+        localStorage.setItem("jwtToken", token);
+        selectedPaciente = null;
+        pacientesById = new Map();
+        pacienteList.innerHTML = "";
+        consultaList.innerHTML = "";
+        usuarioList.innerHTML = "";
+        pacienteSelecionado.textContent = "Selecione um paciente";
+        navConsultas.disabled = true;
+        syncAuthFromToken();
+        updateAuthStatus();
+        applyAccessControl();
+        setView("pacientes");
+        setStatus("Conta criada e login realizado");
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    });
+  }
+
+  if (legacyLoginForm) {
+    legacyLoginForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const body = {
+        email: document.getElementById("loginEmail")?.value.trim().toLowerCase() || "",
+        password: document.getElementById("loginPassword")?.value || ""
+      };
+      try {
+        const response = await apiFetch("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify(body)
+        });
+        token = response.token;
+        localStorage.setItem("jwtToken", token);
+        selectedPaciente = null;
+        pacientesById = new Map();
+        pacienteList.innerHTML = "";
+        consultaList.innerHTML = "";
+        usuarioList.innerHTML = "";
+        pacienteSelecionado.textContent = "Selecione um paciente";
+        navConsultas.disabled = true;
+        syncAuthFromToken();
+        updateAuthStatus();
+        applyAccessControl();
+        setView("pacientes");
+        setStatus("Login realizado");
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    });
+  }
+}
+
+// Logout do usuario atual.
 const logoutButton = document.getElementById("logout");
 logoutButton.addEventListener("click", () => {
   token = "";
@@ -519,65 +1027,211 @@ logoutButton.addEventListener("click", () => {
   setStatus("Logout realizado");
 });
 
-const pacienteForm = document.getElementById("pacienteForm");
-pacienteForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  // Envia apenas digitos para CPF/telefone.
-  const body = {
-    nome: document.getElementById("pacienteNome").value.trim(),
-    cpf: onlyDigits(document.getElementById("pacienteCpf").value, 11),
-    telefone: onlyDigits(document.getElementById("pacienteTelefone").value, 11),
-    email: document.getElementById("pacienteEmail").value.trim().toLowerCase()
-  };
-  try {
-    await apiFetch("/api/pacientes", {
-      method: "POST",
-      body: JSON.stringify(body)
-    });
-    pacienteForm.reset();
-    setStatus("Paciente criado");
-    await loadPacientes();
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-});
+// Cadastro de paciente.
+if (pacienteForm) {
+  pacienteForm.noValidate = true;
+  pacienteForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const isAdmin = currentRole === "admin";
+    const selectedUserEmail = pacienteUsuarioSelect?.value.trim().toLowerCase() || "";
+    const typedEmail = pacienteEmailInput?.value.trim().toLowerCase() || "";
+    const password = pacientePasswordInput?.value || "";
+    const submitButton = pacienteForm.querySelector("button[type='submit']");
+    let emailToUse = isAdmin ? (selectedUserEmail || typedEmail) : currentEmail;
 
-const consultaForm = document.getElementById("consultaForm");
-consultaForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  if (!selectedPaciente) {
-    setStatus("Selecione um paciente primeiro", true);
-    return;
-  }
-  const selectedOption = consultaHorarioSelect.selectedOptions[0];
-  if (!selectedOption || selectedOption.disabled || !selectedOption.value) {
-    setStatus("Selecione um horario disponivel", true);
-    return;
-  }
-  const body = {
-    pacienteId: selectedPaciente.id,
-    data: selectedOption.value,
-    especialidade: document.getElementById("consultaEspecialidade").value.trim(),
-    status: document.getElementById("consultaStatus").value.trim()
-  };
-  try {
-    await apiFetch("/api/consultas", {
-      method: "POST",
-      body: JSON.stringify(body)
-    });
-    const dataSelecionada = consultaDataInput.value;
-    consultaForm.reset();
-    if (dataSelecionada) {
-      consultaDataInput.value = dataSelecionada;
+    if (isAdmin && !emailToUse) {
+      setStatus("Informe um email ou selecione um usuario para vincular", true, 7000);
+      return;
     }
-    setStatus("Consulta criada");
-    await loadConsultas();
-    await loadHorarios();
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-});
 
+    const existingUserEmails = new Set(
+      Array.from(pacienteUsuarioSelect?.options || [])
+        .map(option => (option.value || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const isExistingUser = isAdmin ? existingUserEmails.has(emailToUse) : true;
+
+    const nome = document.getElementById("pacienteNome").value.trim();
+    const cpf = onlyDigits(document.getElementById("pacienteCpf").value, 11);
+    const telefone = onlyDigits(document.getElementById("pacienteTelefone").value, 11);
+
+    if (!nome) {
+      setStatus("Informe o nome do paciente", true, 7000);
+      return;
+    }
+    if (cpf.length !== 11) {
+      setStatus("Informe CPF com 11 digitos", true, 7000);
+      return;
+    }
+    if (telefone.length < 10 || telefone.length > 11) {
+      setStatus("Informe telefone com 10 ou 11 digitos", true, 7000);
+      return;
+    }
+    if (!emailToUse || !emailToUse.includes("@")) {
+      setStatus("Informe um email valido", true, 7000);
+      return;
+    }
+
+    if (!isExistingUser && password.trim().length < 6) {
+      setStatus("Para email novo, informe senha com no minimo 6 caracteres", true, 7000);
+      return;
+    }
+
+    if (isAdmin && Array.from(pacientesById.values()).some(p => p.email?.trim().toLowerCase() === emailToUse)) {
+      setStatus("Esse email ja possui paciente vinculado", true, 7000);
+      return;
+    }
+
+    // Envia apenas digitos para CPF/telefone.
+    const body = {
+      nome,
+      cpf,
+      telefone,
+      email: emailToUse,
+      password: isAdmin && !isExistingUser ? password : ""
+    };
+    try {
+      if (submitButton) {
+        submitButton.disabled = true;
+      }
+      await apiFetch("/api/pacientes", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      pacienteForm.reset();
+      if (pacienteEmailInput && !isAdmin) {
+        pacienteEmailInput.value = currentEmail;
+      }
+      if (pacienteEmailInput && isAdmin) {
+        pacienteEmailInput.readOnly = false;
+      }
+      if (isAdmin) {
+        await loadUsuarioOptionsForPaciente();
+      }
+      setStatus("Paciente criado");
+      closeModal("pacienteModal");
+      await loadPacientes();
+    } catch (error) {
+      setStatus(error.message, true, 9000);
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
+    }
+  });
+}
+
+// Cadastro de consulta.
+if (consultaForm) {
+  consultaForm.noValidate = true;
+  consultaForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const submitButton = consultaForm.querySelector("button[type='submit']");
+    if (!selectedPaciente) {
+      setStatus("Selecione um paciente primeiro", true, 9000);
+      return;
+    }
+    const selectedOption = consultaHorarioSelect.selectedOptions[0];
+    if (!selectedOption || selectedOption.disabled || !selectedOption.value) {
+      setStatus("Selecione um horario disponivel", true, 9000);
+      return;
+    }
+    const especialidade = consultaEspecialidadeInput?.value.trim() || "";
+    if (!especialidade) {
+      setStatus("Informe a especialidade", true, 9000);
+      return;
+    }
+
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    const body = {
+      pacienteId: selectedPaciente.id,
+      data: selectedOption.value,
+      especialidade,
+      status: consultaStatusInput?.value.trim() || "agendada"
+    };
+    try {
+      await apiFetch("/api/consultas", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      const dataSelecionada = consultaDataInput.value;
+      consultaForm.reset();
+      if (dataSelecionada) {
+        consultaDataInput.value = dataSelecionada;
+      }
+      setStatus("Consulta criada");
+      closeModal("consultaModal");
+      await loadConsultas();
+      await loadHorarios();
+    } catch (error) {
+      console.error("Falha ao criar consulta:", error);
+      setStatus(`Nao foi possivel criar consulta: ${error.message}`, true, 12000);
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
+    }
+  });
+}
+
+// Marcacao de consulta para usuario na aba de pacientes.
+if (pacienteConsultaForm) {
+  pacienteConsultaForm.noValidate = true;
+  pacienteConsultaForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (currentRole === "admin") {
+      return;
+    }
+    if (!selectedPaciente) {
+      setStatus("Selecione um paciente primeiro", true);
+      return;
+    }
+    const selectedOption = pacienteConsultaHorarioSelect?.selectedOptions?.[0];
+    if (!selectedOption || selectedOption.disabled || !selectedOption.value) {
+      setStatus("Selecione um horario disponivel", true);
+      return;
+    }
+
+    const especialidade = pacienteConsultaEspecialidadeInput?.value.trim() || "";
+    if (!especialidade) {
+      setStatus("Informe a especialidade", true);
+      return;
+    }
+
+    try {
+      await apiFetch("/api/consultas", {
+        method: "POST",
+        body: JSON.stringify({
+          pacienteId: selectedPaciente.id,
+          data: selectedOption.value,
+          especialidade,
+          status: "agendada"
+        })
+      });
+      const dataSelecionada = pacienteConsultaDataInput?.value || "";
+      pacienteConsultaForm.reset();
+      if (pacienteConsultaDataInput && dataSelecionada) {
+        pacienteConsultaDataInput.value = dataSelecionada;
+      }
+      setStatus("Consulta marcada");
+      await loadConsultas();
+      await loadHorariosPacienteUsuario();
+    } catch (error) {
+      setStatus(error.message, true);
+    }
+  });
+}
+
+if (pacienteConsultaForm) {
+  pacienteConsultaForm.addEventListener("click", () => {
+    loadHorariosPacienteUsuario();
+  });
+}
+
+// Atualizacao de role (admin).
 roleForm.addEventListener("submit", async event => {
   event.preventDefault();
   const body = {
@@ -591,21 +1245,32 @@ roleForm.addEventListener("submit", async event => {
     });
     roleForm.reset();
     setStatus("Role atualizado");
+    closeModal("roleModal");
     await loadUsuarios();
   } catch (error) {
     setStatus(error.message, true);
   }
 });
 
+// Inicializacao da interface com base no token salvo.
 syncAuthFromToken();
 updateAuthStatus();
 applyAccessControl();
+setAuthMode("login");
 
+// Define data padrao do agendamento para hoje.
 if (consultaDataInput) {
-  const hoje = new Date();
-  const local = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000);
-  consultaDataInput.value = local.toISOString().slice(0, 10);
+  ensureConsultaDateValue();
   consultaDataInput.addEventListener("change", () => {
     loadHorarios();
+  });
+}
+
+if (pacienteConsultaDataInput) {
+  const hoje = new Date();
+  const local = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000);
+  pacienteConsultaDataInput.value = local.toISOString().slice(0, 10);
+  pacienteConsultaDataInput.addEventListener("change", () => {
+    loadHorariosPacienteUsuario();
   });
 }

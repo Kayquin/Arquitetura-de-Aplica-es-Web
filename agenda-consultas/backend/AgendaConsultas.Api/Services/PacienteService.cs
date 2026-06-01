@@ -9,10 +9,12 @@ namespace AgendaConsultas.Api.Services;
 public class PacienteService : IPacienteService
 {
     private readonly IPacienteRepository _repository;
+    private readonly IUsuarioRepository _usuarioRepository;
 
-    public PacienteService(IPacienteRepository repository)
+    public PacienteService(IPacienteRepository repository, IUsuarioRepository usuarioRepository)
     {
         _repository = repository;
+        _usuarioRepository = usuarioRepository;
     }
 
     public Task<List<Paciente>> GetAllAsync() => _repository.GetAllAsync();
@@ -29,13 +31,19 @@ public class PacienteService : IPacienteService
         return paciente;
     }
 
+    public Task<Paciente?> GetByEmailAsync(string email) =>
+        _repository.GetByEmailAsync(email.Trim());
+
     public async Task<Paciente> CreateAsync(PacienteCreateDto dto)
     {
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+
         // Validacoes de campos e unicidade.
         // Valida e garante email/cpf unicos.
-        ValidatePaciente(dto.Nome, dto.Cpf, dto.Telefone, dto.Email);
+        ValidatePaciente(dto.Nome, dto.Cpf, dto.Telefone, normalizedEmail);
+        await ValidateUsuarioVinculadoAsync(normalizedEmail);
 
-        if (await _repository.EmailExistsAsync(dto.Email))
+        if (await _repository.EmailExistsAsync(normalizedEmail))
         {
             throw new ArgumentException("Email already registered");
         }
@@ -51,7 +59,7 @@ public class PacienteService : IPacienteService
             Nome = dto.Nome.Trim(),
             Cpf = dto.Cpf.Trim(),
             Telefone = dto.Telefone.Trim(),
-            Email = dto.Email.Trim()
+            Email = normalizedEmail
         };
 
         await _repository.CreateAsync(paciente);
@@ -60,9 +68,12 @@ public class PacienteService : IPacienteService
 
     public async Task UpdateAsync(string id, PacienteUpdateDto dto)
     {
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+
         // Valida e garante existencia antes de atualizar.
         // Rejeita update para id inexistente.
-        ValidatePaciente(dto.Nome, dto.Cpf, dto.Telefone, dto.Email);
+        ValidatePaciente(dto.Nome, dto.Cpf, dto.Telefone, normalizedEmail);
+        await ValidateUsuarioVinculadoAsync(normalizedEmail);
 
         var existing = await _repository.GetByIdAsync(id);
         if (existing is null)
@@ -76,7 +87,7 @@ public class PacienteService : IPacienteService
             Nome = dto.Nome.Trim(),
             Cpf = dto.Cpf.Trim(),
             Telefone = dto.Telefone.Trim(),
-            Email = dto.Email.Trim()
+            Email = normalizedEmail
         };
 
         await _repository.UpdateAsync(id, paciente);
@@ -114,6 +125,15 @@ public class PacienteService : IPacienteService
         if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
         {
             throw new ArgumentException("Email is invalid");
+        }
+    }
+
+    private async Task ValidateUsuarioVinculadoAsync(string email)
+    {
+        var usuario = await _usuarioRepository.GetByEmailAsync(email);
+        if (usuario is null)
+        {
+            throw new ArgumentException("Linked user not found for provided email");
         }
     }
 }

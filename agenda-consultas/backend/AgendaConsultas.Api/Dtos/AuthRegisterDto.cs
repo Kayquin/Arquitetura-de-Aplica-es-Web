@@ -17,4 +17,9 @@ public class AuthRegisterDto
 
     // Role inicial (usuario/admin).
     public string Role { get; set; } = "usuario";
+
+    // Dados do paciente criados automaticamente para role usuario.
+    public string Nome { get; set; } = string.Empty;
+    public string Cpf { get; set; } = string.Empty;
+    public string Telefone { get; set; } = string.Empty;
 }

@@ -12,8 +12,7 @@ public class PacienteServiceTests
     public async Task CreatePaciente_ReturnsPaciente()
     {
         // Arrange
-        var repo = new InMemoryPacienteRepository();
-        var service = new PacienteService(repo);
+        var (service, repo, _) = CreatePacienteService("ana@email.com");
 
         var dto = new PacienteCreateDto
         {
@@ -35,8 +34,7 @@ public class PacienteServiceTests
     public async Task CreatePaciente_InvalidEmail_Throws()
     {
         // Arrange
-        var repo = new InMemoryPacienteRepository();
-        var service = new PacienteService(repo);
+        var (service, _, _) = CreatePacienteService();
 
         var dto = new PacienteCreateDto
         {
@@ -54,8 +52,7 @@ public class PacienteServiceTests
     public async Task CreatePaciente_DuplicateEmail_Throws()
     {
         // Arrange
-        var repo = new InMemoryPacienteRepository();
-        var service = new PacienteService(repo);
+        var (service, _, _) = CreatePacienteService("ana@email.com", "carlos@email.com");
 
         var dto = new PacienteCreateDto
         {
@@ -84,8 +81,7 @@ public class PacienteServiceTests
     public async Task CreatePaciente_DuplicateCpf_Throws()
     {
         // Arrange
-        var repo = new InMemoryPacienteRepository();
-        var service = new PacienteService(repo);
+        var (service, _, _) = CreatePacienteService("ana@email.com", "carlos@email.com");
 
         var dto = new PacienteCreateDto
         {
@@ -114,8 +110,7 @@ public class PacienteServiceTests
     public async Task UpdatePaciente_NotFound_Throws()
     {
         // Arrange
-        var repo = new InMemoryPacienteRepository();
-        var service = new PacienteService(repo);
+        var (service, _, _) = CreatePacienteService("ana@email.com");
 
         var dto = new PacienteUpdateDto
         {
@@ -133,8 +128,7 @@ public class PacienteServiceTests
     public async Task DeletePaciente_NotFound_Throws()
     {
         // Arrange
-        var repo = new InMemoryPacienteRepository();
-        var service = new PacienteService(repo);
+        var (service, _, _) = CreatePacienteService();
 
         // Act/Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.DeleteAsync("missing"));
@@ -144,8 +138,7 @@ public class PacienteServiceTests
     public async Task UpdatePaciente_UpdatesData()
     {
         // Arrange
-        var repo = new InMemoryPacienteRepository();
-        var service = new PacienteService(repo);
+        var (service, repo, _) = CreatePacienteService("ana@email.com");
 
         var paciente = new Paciente
         {
@@ -175,6 +168,37 @@ public class PacienteServiceTests
         Assert.NotNull(updated);
         Assert.Equal("Ana Maria", updated!.Nome);
         Assert.Equal("11888888888", updated.Telefone);
+    }
+
+    [Fact]
+    public async Task CreatePaciente_LinkedUserMissing_Throws()
+    {
+        // Arrange
+        var (service, _, _) = CreatePacienteService();
+        var dto = new PacienteCreateDto
+        {
+            Nome = "Ana Silva",
+            Cpf = "12345678901",
+            Telefone = "11999999999",
+            Email = "ana@email.com"
+        };
+
+        // Act/Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(dto));
+    }
+
+    private static (PacienteService service, InMemoryPacienteRepository pacienteRepo, InMemoryUsuarioRepository usuarioRepo)
+        CreatePacienteService(params string[] userEmails)
+    {
+        var pacienteRepo = new InMemoryPacienteRepository();
+        var usuarioRepo = new InMemoryUsuarioRepository();
+        foreach (var email in userEmails)
+        {
+            usuarioRepo.Add(email);
+        }
+
+        var service = new PacienteService(pacienteRepo, usuarioRepo);
+        return (service, pacienteRepo, usuarioRepo);
     }
 }
 
@@ -472,4 +496,51 @@ internal class InMemoryConsultaRepository : IConsultaRepository
             c.Data == data &&
             c.Status != "cancelada" &&
             (string.IsNullOrWhiteSpace(ignoreId) || c.Id != ignoreId)));
+}
+
+internal class InMemoryUsuarioRepository : IUsuarioRepository
+{
+    private readonly List<Usuario> _items = new();
+
+    public Task<List<Usuario>> GetAllAsync() => Task.FromResult(_items.ToList());
+
+    public Task<Usuario?> GetByIdAsync(string id) =>
+        Task.FromResult(_items.FirstOrDefault(u => u.Id == id));
+
+    public Task<Usuario?> GetByEmailAsync(string email) =>
+        Task.FromResult(_items.FirstOrDefault(u =>
+            string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase)));
+
+    public Task CreateAsync(Usuario usuario)
+    {
+        _items.Add(usuario);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateRoleAsync(string email, string role)
+    {
+        var user = _items.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
+        if (user is not null)
+        {
+            user.Role = role;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(string id)
+    {
+        _items.RemoveAll(u => u.Id == id);
+        return Task.CompletedTask;
+    }
+
+    public void Add(string email)
+    {
+        _items.Add(new Usuario
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Email = email,
+            Role = "usuario",
+            PasswordHash = "hash"
+        });
+    }
 }
