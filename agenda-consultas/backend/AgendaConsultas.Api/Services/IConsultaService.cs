@@ -16,8 +16,10 @@ public interface IConsultaService
     Task<List<ConsultaSlotDto>> GetSlotsAsync(DateTime date);
     // Cria consulta com validacoes.
     Task<Consulta> CreateAsync(ConsultaCreateDto dto);
-    // Atualiza consulta por id.
+    // Atualiza consulta por id (substituicao completa).
     Task UpdateAsync(string id, ConsultaUpdateDto dto);
+    // Atualiza parcialmente consulta por id (apenas campos informados).
+    Task PatchAsync(string id, ConsultaPatchDto dto);
     // Remove consulta por id.
     Task DeleteAsync(string id);
 }

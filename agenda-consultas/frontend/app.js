@@ -1,1276 +1,845 @@
-// Referencias dos elementos da UI.
-const apiBaseInput = document.getElementById("apiBase");
-const saveApiBaseButton = document.getElementById("saveApiBase");
-const authStatus = document.getElementById("authStatus");
-const statusMessage = document.getElementById("statusMessage");
-const pacienteList = document.getElementById("pacienteList");
-const consultaList = document.getElementById("consultaList");
-const usuarioList = document.getElementById("usuarioList");
-const pacienteSelecionado = document.getElementById("pacienteSelecionado");
-const navButtons = document.querySelectorAll(".nav button");
-const navAuth = document.getElementById("navAuth");
-const navPacientes = document.getElementById("navPacientes");
-const navConsultas = document.getElementById("navConsultas");
-const navUsuarios = document.getElementById("navUsuarios");
-const navConfig = document.getElementById("navConfig");
-const pacienteCpfInput = document.getElementById("pacienteCpf");
+// ─────────────────────────────────────────────────
+// Config & estado global
+// ─────────────────────────────────────────────────
+let API_BASE = localStorage.getItem("apiBase") || "http://localhost:5000";
+let API_VERSION = localStorage.getItem("apiVersion") || "v2";
+let token = localStorage.getItem("token") || "";
+let currentRole = localStorage.getItem("role") || "";
+let selectedPacienteId = "";
+let selectedPacienteNome = "";
+
+function apiPath(path) {
+  if (!path.startsWith("/api/")) return path;
+
+  const normalized = path.replace(/^\/api\/+/, "/api/");
+
+  // Se já vier versionada, mantém.
+  if (/^\/api\/v\d+\//i.test(normalized)) {
+    return normalized;
+  }
+
+  return normalized.replace("/api/", `/api/${API_VERSION}/`);
+}
+
+// ─────────────────────────────────────────────────
+// Refs de elementos da UI
+// ─────────────────────────────────────────────────
+const apiBaseInput          = document.getElementById("apiBase");
+const saveApiBaseButton     = document.getElementById("saveApiBase");
+const authStatus            = document.getElementById("authStatus");
+const authUserInfo          = document.getElementById("authUserInfo");
+const statusMessage         = document.getElementById("statusMessage");
+const pacienteList          = document.getElementById("pacienteList");
+const consultaList          = document.getElementById("consultaList");
+const usuarioList           = document.getElementById("usuarioList");
+const pacienteSelecionado   = document.getElementById("pacienteSelecionado");
+const navButtons            = document.querySelectorAll(".nav button");
+const navAuth               = document.getElementById("navAuth");
+const navPacientes          = document.getElementById("navPacientes");
+const navConsultas          = document.getElementById("navConsultas");
+const navUsuarios           = document.getElementById("navUsuarios");
+const navConfig             = document.getElementById("navConfig");
+const pacienteCpfInput      = document.getElementById("pacienteCpf");
 const pacienteTelefoneInput = document.getElementById("pacienteTelefone");
-const pacienteEmailInput = document.getElementById("pacienteEmail");
+const pacienteEmailInput    = document.getElementById("pacienteEmail");
 const pacientePasswordInput = document.getElementById("pacientePassword");
-const pacienteUsuarioGroup = document.getElementById("pacienteUsuarioGroup");
+const pacienteUsuarioGroup  = document.getElementById("pacienteUsuarioGroup");
 const pacienteUsuarioSelect = document.getElementById("pacienteUsuario");
-const pacienteConsultaForm = document.getElementById("pacienteConsultaForm");
+const pacienteConsultaForm  = document.getElementById("pacienteConsultaForm");
 const pacienteConsultaSelecionado = document.getElementById("pacienteConsultaSelecionado");
-const pacienteConsultaDataInput = document.getElementById("pacienteConsultaData");
+const pacienteConsultaDataInput   = document.getElementById("pacienteConsultaData");
 const pacienteConsultaHorarioSelect = document.getElementById("pacienteConsultaHorario");
 const pacienteConsultaEspecialidadeInput = document.getElementById("pacienteConsultaEspecialidade");
-const pacienteForm = document.getElementById("pacienteForm");
-const consultaForm = document.getElementById("consultaForm");
-const pacienteAdminActions = document.getElementById("pacienteAdminActions");
-const consultaAdminActions = document.getElementById("consultaAdminActions");
-const usuarioAdminActions = document.getElementById("usuarioAdminActions");
-const openPacienteModalButton = document.getElementById("openPacienteModal");
-const openConsultaModalButton = document.getElementById("openConsultaModal");
-const openRoleModalButton = document.getElementById("openRoleModal");
-const pacienteModal = document.getElementById("pacienteModal");
-const consultaModal = document.getElementById("consultaModal");
-const roleModal = document.getElementById("roleModal");
-const roleForm = document.getElementById("roleForm");
-const roleEmailInput = document.getElementById("roleEmail");
-const roleValueInput = document.getElementById("roleValue");
-const consultaDataInput = document.getElementById("consultaData");
-const consultaHorarioSelect = document.getElementById("consultaHorario");
-const consultaEspecialidadeInput = document.getElementById("consultaEspecialidade");
-const consultaStatusInput = document.getElementById("consultaStatus");
-const authForm = document.getElementById("authForm");
-const authFormTitle = document.getElementById("authFormTitle");
+const toastContainer        = document.getElementById("toastContainer");
+
+// ─────────────────────────────────────────────────
+// Sistema de Toast (notificacoes flutuantes)
+// ─────────────────────────────────────────────────
+function showToast(message, type = "success") {
+  const icons = { success: "✅", error: "❌", info: "ℹ️" };
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span class="toast-icon">${icons[type] || "ℹ️"}</span><span>${message}</span>`;
+  toastContainer.appendChild(toast);
+
+  // Remove o toast apos 4 segundos com animacao de saida.
+  setTimeout(() => {
+    toast.classList.add("toast-exit");
+    toast.addEventListener("animationend", () => toast.remove(), { once: true });
+  }, 4000);
+}
+
+// Mantém o statusMessage no rodape para compatibilidade.
+function setStatus(msg) {
+  statusMessage.textContent = msg;
+}
+
+// ─────────────────────────────────────────────────
+// Dialogo de confirmacao (Promise-based)
+// ─────────────────────────────────────────────────
+function confirmAction(message, title = "Confirmar acao") {
+  return new Promise((resolve) => {
+    const modal   = document.getElementById("confirmModal");
+    const titleEl = document.getElementById("confirmTitle");
+    const msgEl   = document.getElementById("confirmMessage");
+    const okBtn   = document.getElementById("confirmOk");
+    const cancelBtn = document.getElementById("confirmCancel");
+
+    titleEl.textContent = title;
+    msgEl.textContent   = message;
+    modal.hidden = false;
+
+    function cleanup(result) {
+      modal.hidden = true;
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      resolve(result);
+    }
+
+    function onOk()     { cleanup(true);  }
+    function onCancel() { cleanup(false); }
+
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+  });
+}
+
+// ─────────────────────────────────────────────────
+// Loading states
+// ─────────────────────────────────────────────────
+function showLoading(id) {
+  const el = document.getElementById(id);
+  if (el) el.hidden = false;
+}
+
+function hideLoading(id) {
+  const el = document.getElementById(id);
+  if (el) el.hidden = true;
+}
+
+// ─────────────────────────────────────────────────
+// Helpers de API
+// ─────────────────────────────────────────────────
+async function apiFetch(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${apiPath(path)}`, { ...options, headers });
+
+  if (res.status === 204) return null;
+
+  const text = await res.text();
+  let data;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+
+  if (!res.ok) {
+    const msg = data?.message || `Erro ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return data;
+}
+
+// ─────────────────────────────────────────────────
+// Gestao de modais
+// ─────────────────────────────────────────────────
+function openModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.hidden = false;
+}
+
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.hidden = true;
+}
+
+// Fecha modal ao clicar no botao com data-close-modal.
+document.addEventListener("click", (e) => {
+  const target = e.target.closest("[data-close-modal]");
+  if (target) closeModal(target.dataset.closeModal);
+});
+
+// ─────────────────────────────────────────────────
+// Navegacao entre views
+// ─────────────────────────────────────────────────
+navButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    navButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+    const view = document.getElementById(`view-${btn.dataset.view}`);
+    if (view) view.classList.add("active");
+
+    // Carrega dados apenas com sessao ativa.
+    if (!token) return;
+    if (btn.dataset.view === "pacientes") loadPacientes();
+    if (btn.dataset.view === "consultas") {
+      if (currentRole === "admin") {
+        pacienteSelecionado.textContent = "Todas as consultas";
+        pacienteConsultaForm.hidden = true;
+        loadConsultas("");
+      } else if (selectedPacienteId) {
+        pacienteSelecionado.textContent = `Consultas de: ${selectedPacienteNome}`;
+        pacienteConsultaForm.hidden = false;
+        pacienteConsultaSelecionado.textContent = `Paciente: ${selectedPacienteNome}`;
+        loadConsultas(selectedPacienteId);
+      } else {
+        consultaList.innerHTML = '<li style="color:var(--muted);padding:12px;text-align:center;font-size:14px;">Selecione um paciente na aba Pacientes.</li>';
+        pacienteConsultaForm.hidden = true;
+      }
+    }
+    if (btn.dataset.view === "usuarios" && currentRole === "admin") loadUsuarios();
+  });
+});
+
+// ─────────────────────────────────────────────────
+// Autenticacao
+// ─────────────────────────────────────────────────
+const authForm     = document.getElementById("authForm");
+const authEmail    = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authSubmit   = document.getElementById("authSubmit");
+const modeLogin    = document.getElementById("modeLogin");
+const modeRegister = document.getElementById("modeRegister");
 const authStepHint = document.getElementById("authStepHint");
 const authModeInfo = document.getElementById("authModeInfo");
-const authEmailInput = document.getElementById("authEmail");
-const authPasswordInput = document.getElementById("authPassword");
-const authSubmitButton = document.getElementById("authSubmit");
-const modeLoginButton = document.getElementById("modeLogin");
-const modeRegisterButton = document.getElementById("modeRegister");
-const legacyRegisterForm = document.getElementById("registerForm");
-const legacyLoginForm = document.getElementById("loginForm");
-
-// Estado da aplicacao em memoria.
-let apiBase = apiBaseInput.value.trim();
-let token = localStorage.getItem("jwtToken") || "";
-let selectedPaciente = null;
-let currentRole = "";
-let currentEmail = "";
-let pacientesById = new Map();
 let authMode = "login";
-let activeModalId = "";
-let statusTimerId = null;
-let authRegisterFields = null;
-let authNomeInput = null;
-let authCpfInput = null;
-let authTelefoneInput = null;
-const pacienteConsultaParent = pacienteConsultaForm ? pacienteConsultaForm.parentElement : null;
 
-// Atualiza mensagem de status no rodape.
-function setStatus(message, isError = false, autoClearMs = 5000) {
-  if (statusTimerId) {
-    clearTimeout(statusTimerId);
-    statusTimerId = null;
-  }
-
-  statusMessage.textContent = message;
-  statusMessage.style.color = isError ? "#b91c1c" : "#2563eb";
-
-  if (!message || autoClearMs <= 0) {
-    return;
-  }
-
-  statusTimerId = setTimeout(() => {
-    statusMessage.textContent = "";
-    statusMessage.style.color = "";
-    statusTimerId = null;
-  }, autoClearMs);
-}
-
-// Mostra quem esta logado no card de status.
-function updateAuthStatus() {
-  if (!token) {
-    authStatus.textContent = "Sem login";
-    return;
-  }
-
-  const roleText = currentRole ? ` (${currentRole})` : "";
-  const emailText = currentEmail || "Logado";
-  authStatus.textContent = `${emailText}${roleText}`;
-}
-
-// Alterna entre as views principais.
-function setView(view) {
-  const target = document.getElementById(`view-${view}`);
-  if (!target || target.hidden) {
-    return;
-  }
-
-  document.querySelectorAll(".view").forEach(section => {
-    section.classList.toggle("active", section.id === `view-${view}`);
-  });
-  navButtons.forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.view === view);
-  });
-
-  if (view === "pacientes") {
-    loadPacientes();
-    loadUsuarioOptionsForPaciente();
-    loadHorariosPacienteUsuario();
-  }
-  if (view === "consultas") {
-    if (!selectedPaciente && currentRole === "admin") {
-      pacienteSelecionado.textContent = "Todas as consultas";
-    } else if (currentRole !== "admin") {
-      pacienteSelecionado.textContent = "Minhas consultas";
-    }
-    loadConsultas();
-    if (currentRole === "admin") {
-      loadHorarios();
-    }
-  }
-  if (view === "usuarios") {
-    loadUsuarios();
-  }
-}
-
-// Faz parse do JWT para extrair claims.
-function parseJwt(tokenValue) {
-  try {
-    const payload = tokenValue.split(".")[1];
-    if (!payload) {
-      return null;
-    }
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(normalized.length + (4 - (normalized.length % 4)) % 4, "=");
-    const json = atob(padded);
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
-// Atualiza email/role a partir do token atual.
-function syncAuthFromToken() {
-  currentRole = "";
-  currentEmail = "";
-  if (!token) {
-    return;
-  }
-
-  const payload = parseJwt(token);
-  if (!payload) {
-    return;
-  }
-
-  currentEmail =
-    payload.email ||
-    payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] ||
-    payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] ||
-    "";
-
-  currentRole =
-    payload.role ||
-    payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ||
-    "";
-  currentRole = currentRole.trim().toLowerCase();
-}
-
-// Ajusta visibilidade e permissoes do menu.
-function applyAccessControl() {
-  const isLogged = Boolean(token);
-  const isAdmin = currentRole === "admin";
-  const isUsuario = currentRole === "usuario";
-
-  navPacientes.hidden = !isLogged;
-  navConsultas.hidden = !isLogged;
-  navUsuarios.hidden = !isAdmin;
-  navConfig.hidden = !isAdmin;
-
-  navPacientes.disabled = !isLogged;
-  navConsultas.disabled = !isLogged || (isAdmin && !selectedPaciente);
-
-  if (pacienteUsuarioGroup) {
-    pacienteUsuarioGroup.hidden = !isAdmin;
-  }
-  if (pacienteAdminActions) {
-    pacienteAdminActions.hidden = !isAdmin;
-  }
-  if (consultaAdminActions) {
-    consultaAdminActions.hidden = !isAdmin;
-  }
-  if (usuarioAdminActions) {
-    usuarioAdminActions.hidden = !isAdmin;
-  }
-  ensurePacienteConsultaMounted(isLogged && isUsuario);
-  if (pacienteEmailInput) {
-    if (isLogged && !isAdmin) {
-      pacienteEmailInput.value = currentEmail;
-      pacienteEmailInput.readOnly = true;
-    } else {
-      pacienteEmailInput.readOnly = false;
-    }
-  }
-
-  document.getElementById("view-pacientes").hidden = !isLogged;
-  document.getElementById("view-consultas").hidden = !isLogged;
-  document.getElementById("view-usuarios").hidden = !isAdmin;
-  document.getElementById("view-config").hidden = !isAdmin;
-
-  if (!isLogged) {
-    closeModal("pacienteModal");
-    closeModal("consultaModal");
-    closeModal("roleModal");
-    setView("auth");
-  } else if (document.getElementById("view-auth").classList.contains("active")) {
-    setView("pacientes");
-  }
-
-  if (!isAdmin) {
-    closeModal("pacienteModal");
-    closeModal("consultaModal");
-    closeModal("roleModal");
-  }
-}
-
-function openModal(modalId) {
-  const modal = document.getElementById(modalId);
-  if (!modal) {
-    return;
-  }
-  modal.hidden = false;
-  activeModalId = modalId;
-}
-
-function closeModal(modalId) {
-  const modal = document.getElementById(modalId);
-  if (!modal) {
-    return;
-  }
-  modal.hidden = true;
-  if (activeModalId === modalId) {
-    activeModalId = "";
-  }
-}
-
-function todayIsoDate() {
-  const hoje = new Date();
-  const local = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-}
-
-function ensureConsultaDateValue() {
-  if (!consultaDataInput) {
-    return;
-  }
-  if (!consultaDataInput.value) {
-    consultaDataInput.value = todayIsoDate();
-  }
-}
-
-function ensurePacienteConsultaMounted(shouldMount) {
-  if (!pacienteConsultaForm || !pacienteConsultaParent) {
-    return;
-  }
-
-  if (shouldMount) {
-    if (!pacienteConsultaForm.isConnected) {
-      if (pacienteAdminActions && pacienteAdminActions.parentElement === pacienteConsultaParent) {
-        pacienteConsultaParent.insertBefore(pacienteConsultaForm, pacienteAdminActions);
-      } else {
-        pacienteConsultaParent.appendChild(pacienteConsultaForm);
-      }
-    }
-    return;
-  }
-
-  if (pacienteConsultaForm.isConnected) {
-    pacienteConsultaForm.remove();
-  }
-}
-
-function ensureRegisterFieldsMounted() {
-  if (!authForm || !authSubmitButton || authRegisterFields) {
-    return;
-  }
-
-  authRegisterFields = document.createElement("div");
-  authRegisterFields.id = "authRegisterFields";
-  authRegisterFields.className = "field-group";
-
-  authNomeInput = document.createElement("input");
-  authNomeInput.id = "authNome";
-  authNomeInput.type = "text";
-  authNomeInput.placeholder = "Nome completo";
-
-  authCpfInput = document.createElement("input");
-  authCpfInput.id = "authCpf";
-  authCpfInput.type = "text";
-  authCpfInput.placeholder = "CPF";
-  authCpfInput.addEventListener("input", event => {
-    event.target.value = formatCpf(event.target.value);
-  });
-
-  authTelefoneInput = document.createElement("input");
-  authTelefoneInput.id = "authTelefone";
-  authTelefoneInput.type = "text";
-  authTelefoneInput.placeholder = "Telefone";
-  authTelefoneInput.addEventListener("input", event => {
-    event.target.value = formatPhone(event.target.value);
-  });
-
-  authRegisterFields.appendChild(authNomeInput);
-  authRegisterFields.appendChild(authCpfInput);
-  authRegisterFields.appendChild(authTelefoneInput);
-  authForm.insertBefore(authRegisterFields, authSubmitButton);
-}
-
-function removeRegisterFieldsMounted() {
-  if (authRegisterFields && authRegisterFields.parentElement) {
-    authRegisterFields.parentElement.removeChild(authRegisterFields);
-  }
-  authRegisterFields = null;
-  authNomeInput = null;
-  authCpfInput = null;
-  authTelefoneInput = null;
-}
-
-// Carrega usuarios para facilitar vinculacao ao criar paciente (admin).
-async function loadUsuarioOptionsForPaciente() {
-  if (!pacienteUsuarioSelect || currentRole !== "admin" || !token) {
-    return;
-  }
-
-  try {
-    const usuarios = await apiFetch("/api/usuarios");
-    const previousValue = pacienteUsuarioSelect.value;
-    pacienteUsuarioSelect.innerHTML = "";
-
-    const defaultOption = document.createElement("option");
-    defaultOption.value = "";
-    defaultOption.textContent = "Selecione um usuario cadastrado";
-    pacienteUsuarioSelect.appendChild(defaultOption);
-
-    usuarios
-      .filter(usuario => usuario.email)
-      .forEach(usuario => {
-        const option = document.createElement("option");
-        option.value = usuario.email.toLowerCase();
-        option.textContent = `${usuario.email} (${usuario.role})`;
-        if (option.value === previousValue) {
-          option.selected = true;
-        }
-        pacienteUsuarioSelect.appendChild(option);
-      });
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-}
-
-// Atualiza o formulario unico entre login e cadastro.
 function setAuthMode(mode) {
-  if (
-    !modeLoginButton ||
-    !modeRegisterButton ||
-    !authFormTitle ||
-    !authStepHint ||
-    !authSubmitButton ||
-    !authPasswordInput
-  ) {
-    return;
-  }
+  authMode = mode;
+  const isLogin = mode === "login";
 
-  authMode = mode === "register" ? "register" : "login";
-  const isRegister = authMode === "register";
-  if (authForm) {
-    authForm.dataset.mode = isRegister ? "register" : "login";
-  }
+  modeLogin.classList.toggle("active", isLogin);
+  modeLogin.setAttribute("aria-pressed", String(isLogin));
+  modeRegister.classList.toggle("active", !isLogin);
+  modeRegister.setAttribute("aria-pressed", String(!isLogin));
 
-  modeLoginButton.classList.toggle("active", !isRegister);
-  modeRegisterButton.classList.toggle("active", isRegister);
-  modeLoginButton.setAttribute("aria-pressed", String(!isRegister));
-  modeRegisterButton.setAttribute("aria-pressed", String(isRegister));
-  authFormTitle.textContent = `Etapa 1: ${isRegister ? "criar conta" : "entrar"}`;
-  authStepHint.textContent = isRegister
-    ? "Etapa 2: informe dados da conta e do paciente."
-    : "Etapa 2: informe email e senha para entrar.";
-  if (authModeInfo) {
-    authModeInfo.textContent = isRegister
-      ? "Modo criar conta: cria usuario e paciente automaticamente."
-      : "Modo login: acesso rapido.";
-  }
-  authSubmitButton.textContent = isRegister ? "Criar conta" : "Entrar";
-  authPasswordInput.minLength = isRegister ? 6 : 0;
-
-  if (isRegister) {
-    ensureRegisterFieldsMounted();
-    if (authNomeInput) authNomeInput.required = true;
-    if (authCpfInput) authCpfInput.required = true;
-    if (authTelefoneInput) authTelefoneInput.required = true;
-  } else {
-    removeRegisterFieldsMounted();
-  }
+  authSubmit.textContent  = isLogin ? "Entrar" : "Criar conta";
+  authStepHint.textContent = isLogin
+    ? "Etapa 2: informe email e senha para entrar."
+    : "Etapa 2: informe email e senha (min 6 chars) para criar conta.";
+  authModeInfo.textContent = isLogin
+    ? "Modo login: acesso rapido."
+    : "Modo registro: cria conta de usuario comum.";
+  authForm.dataset.mode = mode;
 }
 
-// Helpers de formatacao de entradas.
-function onlyDigits(value, maxLength) {
-  // Mantem apenas digitos para validar no backend.
-  const digits = value.replace(/\D/g, "");
-  return typeof maxLength === "number" ? digits.slice(0, maxLength) : digits;
-}
-
-function formatCpf(value) {
-  // Formata CPF como 000.000.000-00 enquanto digita.
-  const digits = onlyDigits(value, 11);
-  const part1 = digits.slice(0, 3);
-  const part2 = digits.slice(3, 6);
-  const part3 = digits.slice(6, 9);
-  const part4 = digits.slice(9, 11);
-  let formatted = part1;
-  if (part2) formatted += `.${part2}`;
-  if (part3) formatted += `.${part3}`;
-  if (part4) formatted += `-${part4}`;
-  return formatted;
-}
-
-function formatPhone(value) {
-  // Formata telefone como (DD) 0000-0000 ou (DD) 00000-0000.
-  const digits = onlyDigits(value, 11);
-  const ddd = digits.slice(0, 2);
-  const part1 = digits.length > 10 ? digits.slice(2, 7) : digits.slice(2, 6);
-  const part2 = digits.length > 10 ? digits.slice(7, 11) : digits.slice(6, 10);
-  if (!ddd) return digits;
-  if (!part1) return `(${ddd}`;
-  if (!part2) return `(${ddd}) ${part1}`;
-  return `(${ddd}) ${part1}-${part2}`;
-}
-
-// Exibe apenas HH:mm do ISO.
-function formatHorarioLabel(isoDate) {
-  if (!isoDate || isoDate.length < 16) {
-    return "";
-  }
-  return isoDate.slice(11, 16);
-}
-
-// Formata data exibida na lista de consultas.
-function formatConsultaDate(consulta) {
-  const valor = consulta.dataBrasil || consulta.data;
-  if (!valor) {
-    return "";
-  }
-  const data = new Date(valor);
-  if (Number.isNaN(data.getTime())) {
-    return valor;
-  }
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Sao_Paulo"
-  }).format(data);
-}
-
-// Renderiza select de horarios padronizados.
-function renderHorarios(slots) {
-  renderHorariosInSelect(consultaHorarioSelect, slots);
-}
-
-// Renderiza horarios em qualquer select de consulta.
-function renderHorariosInSelect(selectEl, slots) {
-  if (!selectEl) {
-    return;
-  }
-
-  selectEl.innerHTML = "";
-  if (!slots || slots.length === 0) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "Sem horarios para o dia";
-    option.disabled = true;
-    option.selected = true;
-    selectEl.appendChild(option);
-    return;
-  }
-
-  let selecionado = false;
-  slots.forEach(slot => {
-    const option = document.createElement("option");
-    option.value = slot.data;
-    option.textContent = formatHorarioLabel(slot.data);
-    if (!slot.disponivel) {
-      option.disabled = true;
-      option.textContent += " (ocupado)";
-    }
-    if (!selecionado && slot.disponivel) {
-      option.selected = true;
-      selecionado = true;
-    }
-    selectEl.appendChild(option);
-  });
-}
-
-// Normaliza mensagens de erro da API.
-function extractErrorMessage(data) {
-  if (!data || typeof data !== "object") {
-    return null;
-  }
-  if (typeof data.message === "string" && data.message.trim()) {
-    return data.message;
-  }
-  if (typeof data.title === "string" && data.title.trim()) {
-    return data.title;
-  }
-  if (data.errors && typeof data.errors === "object") {
-    const messages = Object.values(data.errors)
-      .flat()
-      .filter(Boolean);
-    if (messages.length) {
-      return messages.join(" | ");
-    }
-  }
-  return null;
-}
-
-// Fetch centralizado com JWT e tratamento de erros.
-async function apiFetch(path, options = {}) {
-  // Fetch centralizado com JSON e JWT.
-  const headers = options.headers || {};
-  if (options.body && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json";
-  }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${apiBase}${path}`, { ...options, headers });
-  if (!response.ok) {
-    // Tenta mostrar erros de validacao retornados pela API.
-    let message = `Erro ${response.status}`;
-    try {
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        const data = await response.json();
-        message = extractErrorMessage(data) || message;
-      } else {
-        const text = await response.text();
-        if (text) {
-          message = text;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    if (response.status === 401) {
-      token = "";
-      localStorage.removeItem("jwtToken");
-      syncAuthFromToken();
-      updateAuthStatus();
-      applyAccessControl();
-      setView("auth");
-    }
-    throw new Error(message);
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  return response.json();
-}
-
-// Carrega lista de pacientes e atualiza cache por id.
-async function loadPacientes() {
-  if (!token) {
-    setStatus("Faca login para ver pacientes", true);
-    return;
-  }
-  try {
-    pacienteList.innerHTML = "";
-    const pacientes = await apiFetch("/api/pacientes");
-    const isAdmin = currentRole === "admin";
-
-    if (!isAdmin) {
-      selectedPaciente = pacientes.length > 0 ? pacientes[0] : null;
-      if (selectedPaciente) {
-        pacienteSelecionado.textContent = `Paciente: ${selectedPaciente.nome}`;
-        if (pacienteConsultaSelecionado) {
-          pacienteConsultaSelecionado.textContent = `Paciente: ${selectedPaciente.nome}`;
-        }
-        navConsultas.disabled = false;
-        loadHorariosPacienteUsuario();
-      } else {
-        pacienteSelecionado.textContent = "Cadastre seu paciente para marcar consulta";
-        if (pacienteConsultaSelecionado) {
-          pacienteConsultaSelecionado.textContent = "Cadastre seu paciente para marcar consulta";
-        }
-        navConsultas.disabled = true;
-      }
-    }
-
-    pacientesById = new Map(pacientes.map(paciente => [paciente.id, paciente]));
-    pacienteList.innerHTML = "";
-    pacientes.forEach(paciente => {
-      const actionLabel = isAdmin ? "Ver consultas" : "Selecionar para marcar";
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <strong>${paciente.nome}</strong>
-        <span>${paciente.email}</span>
-        <span>${paciente.telefone}</span>
-        <div class="actions">
-          <button data-id="${paciente.id}">${actionLabel}</button>
-        </div>
-      `;
-      li.querySelector("button").addEventListener("click", () => {
-        selectPaciente(paciente);
-      });
-      pacienteList.appendChild(li);
-    });
-  } catch (error) {
-    pacienteList.innerHTML = "";
-    setStatus(error.message, true);
-  }
-}
-
-// Carrega consultas do paciente selecionado ou todas (admin).
-async function loadConsultas() {
-  if (!token) {
-    setStatus("Faca login para ver consultas", true);
-    return;
-  }
-
-  try {
-    const isAdmin = currentRole === "admin";
-    consultaList.innerHTML = "";
-    if (!selectedPaciente && isAdmin && pacientesById.size === 0) {
-      const pacientes = await apiFetch("/api/pacientes");
-      pacientesById = new Map(pacientes.map(paciente => [paciente.id, paciente]));
-    }
-
-    // Usuario comum sempre consulta pelo proprio token (evita pacienteId antigo em memoria).
-    const endpoint = isAdmin
-      ? (selectedPaciente ? `/api/consultas/paciente/${selectedPaciente.id}` : "/api/consultas")
-      : "/api/consultas";
-
-    if (!endpoint) {
-      return;
-    }
-
-    const consultas = await apiFetch(endpoint);
-    consultas.forEach(consulta => {
-      const li = document.createElement("li");
-      const dataFormatada = formatConsultaDate(consulta);
-      const pacienteNome = !selectedPaciente
-        ? (pacientesById.get(consulta.pacienteId)?.nome || consulta.pacienteId)
-        : "";
-      const actionHtml = isAdmin
-        ? `<div class="actions"><button data-id="${consulta.id}">Excluir</button></div>`
-        : "";
-      li.innerHTML = `
-        <strong>${consulta.especialidade}</strong>
-        <span>${dataFormatada}</span>
-        <span>Status: ${consulta.status}</span>
-        ${selectedPaciente ? "" : `<span>Paciente: ${pacienteNome}</span>`}
-        ${actionHtml}
-      `;
-      if (isAdmin) {
-        li.querySelector("button").addEventListener("click", async () => {
-          try {
-            await apiFetch(`/api/consultas/${consulta.id}`, { method: "DELETE" });
-            setStatus("Consulta removida");
-            await loadConsultas();
-          } catch (error) {
-            setStatus(error.message, true);
-          }
-        });
-      }
-      consultaList.appendChild(li);
-    });
-  } catch (error) {
-    consultaList.innerHTML = "";
-    setStatus(error.message, true);
-  }
-}
-
-// Carrega horarios disponiveis do dia.
-async function loadHorarios() {
-  if (!token) {
-    setStatus("Faca login para ver consultas", true);
-    return;
-  }
-
-  if (!selectedPaciente) {
-    return;
-  }
-
-  if (!consultaDataInput.value) {
-    return;
-  }
-
-  try {
-    const slots = await apiFetch(`/api/consultas/slots?date=${encodeURIComponent(consultaDataInput.value)}`);
-    renderHorarios(slots);
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-}
-
-// Seleciona paciente e abre a view de consultas.
-function selectPaciente(paciente) {
-  selectedPaciente = paciente;
-  pacienteSelecionado.textContent = `Paciente: ${paciente.nome}`;
-  if (pacienteConsultaSelecionado) {
-    pacienteConsultaSelecionado.textContent = `Paciente: ${paciente.nome}`;
-  }
-  navConsultas.disabled = false;
-  if (currentRole === "admin") {
-    setView("consultas");
-    return;
-  }
-
-  loadHorariosPacienteUsuario();
-}
-
-// Carrega horarios para o formulario de marcacao na aba de pacientes (usuario).
-async function loadHorariosPacienteUsuario() {
-  if (!token || currentRole === "admin" || !selectedPaciente || !pacienteConsultaDataInput) {
-    return;
-  }
-
-  if (!pacienteConsultaDataInput.value) {
-    return;
-  }
-
-  try {
-    const slots = await apiFetch(`/api/consultas/slots?date=${encodeURIComponent(pacienteConsultaDataInput.value)}`);
-    renderHorariosInSelect(pacienteConsultaHorarioSelect, slots);
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-}
-
-// Carrega usuarios (admin).
-async function loadUsuarios() {
-  if (!token) {
-    setStatus("Faca login para ver usuarios", true);
-    return;
-  }
-
-  try {
-    const usuarios = await apiFetch("/api/usuarios");
-    usuarioList.innerHTML = "";
-    usuarios.forEach(usuario => {
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <strong>${usuario.email}</strong>
-        <span>Role: ${usuario.role}</span>
-        <span>ID: ${usuario.id}</span>
-        <div class="actions">
-          <button class="danger" data-id="${usuario.id}">Excluir</button>
-        </div>
-      `;
-      li.querySelector("button").addEventListener("click", async () => {
-        try {
-          await apiFetch(`/api/usuarios/${usuario.id}`, { method: "DELETE" });
-          setStatus("Usuario removido");
-          await loadUsuarios();
-        } catch (error) {
-          setStatus(error.message, true);
-        }
-      });
-      usuarioList.appendChild(li);
-    });
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-}
-
-// Acao para salvar a API base.
-saveApiBaseButton.addEventListener("click", () => {
-  apiBase = apiBaseInput.value.trim();
-  setStatus("API base atualizada");
-});
-
-if (pacienteCpfInput) {
-  pacienteCpfInput.addEventListener("input", event => {
-    event.target.value = formatCpf(event.target.value);
-  });
-}
-
-if (pacienteTelefoneInput) {
-  pacienteTelefoneInput.addEventListener("input", event => {
-    event.target.value = formatPhone(event.target.value);
-  });
-}
-
-if (pacienteUsuarioSelect) {
-  pacienteUsuarioSelect.addEventListener("change", event => {
-    const email = event.target.value;
-    if (!pacienteEmailInput) {
-      return;
-    }
-
-    if (email) {
-      pacienteEmailInput.value = email;
-      pacienteEmailInput.readOnly = true;
-      if (pacientePasswordInput) {
-        pacientePasswordInput.value = "";
-        pacientePasswordInput.disabled = true;
-      }
-      return;
-    }
-
-    if (currentRole === "admin") {
-      pacienteEmailInput.readOnly = false;
-      pacienteEmailInput.value = "";
-      if (pacientePasswordInput) {
-        pacientePasswordInput.disabled = false;
-      }
-    }
-  });
-}
-
-if (openPacienteModalButton) {
-  openPacienteModalButton.addEventListener("click", async () => {
-    if (pacienteForm) {
-      pacienteForm.reset();
-    }
-    if (pacienteEmailInput) {
-      pacienteEmailInput.readOnly = false;
-      pacienteEmailInput.value = "";
-    }
-    if (pacientePasswordInput) {
-      pacientePasswordInput.disabled = false;
-      pacientePasswordInput.value = "";
-    }
-    await loadUsuarioOptionsForPaciente();
-    openModal("pacienteModal");
-  });
-}
-
-if (openConsultaModalButton) {
-  openConsultaModalButton.addEventListener("click", async () => {
-    if (!selectedPaciente) {
-      setStatus("Selecione um paciente antes de marcar consulta", true);
-      return;
-    }
-    if (consultaForm) {
-      consultaForm.reset();
-    }
-    ensureConsultaDateValue();
-    await loadHorarios();
-    openModal("consultaModal");
-  });
-}
-
-if (openRoleModalButton) {
-  openRoleModalButton.addEventListener("click", () => openModal("roleModal"));
-}
-
-document.querySelectorAll("[data-close-modal]").forEach(button => {
-  button.addEventListener("click", () => {
-    closeModal(button.getAttribute("data-close-modal"));
-  });
-});
-
-document.addEventListener("keydown", event => {
-  if (event.key === "Escape" && activeModalId) {
-    closeModal(activeModalId);
-  }
-});
-
-// Troca de abas.
-navButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
-    if (btn.hidden || btn.disabled) {
-      return;
-    }
-    setView(btn.dataset.view);
-  });
-});
-
-if (modeLoginButton) {
-  modeLoginButton.addEventListener("click", () => {
-    setAuthMode("login");
-  });
-}
-
-if (modeRegisterButton) {
-  modeRegisterButton.addEventListener("click", () => {
-    setAuthMode("register");
-  });
-}
-
-// Login e cadastro no mesmo formulario.
-if (authForm && authEmailInput && authPasswordInput) {
-  authForm.addEventListener("submit", async event => {
-    event.preventDefault();
-    const body = {
-      email: authEmailInput.value.trim().toLowerCase(),
-      password: authPasswordInput.value
-    };
-    const isRegister = authMode === "register";
-    const endpoint = isRegister ? "/api/auth/register" : "/api/auth/login";
-    if (isRegister) {
-      body.role = "usuario";
-      body.nome = authNomeInput ? authNomeInput.value.trim() : "";
-      body.cpf = onlyDigits(authCpfInput ? authCpfInput.value : "", 11);
-      body.telefone = onlyDigits(authTelefoneInput ? authTelefoneInput.value : "", 11);
-    }
-
-    try {
-      const response = await apiFetch(endpoint, {
-        method: "POST",
-        body: JSON.stringify(body)
-      });
-      token = response.token;
-      localStorage.setItem("jwtToken", token);
-      // Evita carregar estado da sessao anterior ao trocar usuario.
-      selectedPaciente = null;
-      pacientesById = new Map();
-      pacienteList.innerHTML = "";
-      consultaList.innerHTML = "";
-      usuarioList.innerHTML = "";
-      pacienteSelecionado.textContent = "Selecione um paciente";
-      navConsultas.disabled = true;
-      syncAuthFromToken();
-      updateAuthStatus();
-      applyAccessControl();
-      setView("pacientes");
-      setStatus(isRegister ? "Conta criada e login realizado" : "Login realizado");
-    } catch (error) {
-      setStatus(error.message, true);
-    }
-  });
-} else {
-  // Compatibilidade com layout antigo (formularios separados).
-  if (legacyRegisterForm) {
-    legacyRegisterForm.addEventListener("submit", async event => {
-      event.preventDefault();
-      const body = {
-        email: document.getElementById("regEmail")?.value.trim().toLowerCase() || "",
-        password: document.getElementById("regPassword")?.value || "",
-        role: "usuario"
-      };
-      try {
-        const response = await apiFetch("/api/auth/register", {
-          method: "POST",
-          body: JSON.stringify(body)
-        });
-        token = response.token;
-        localStorage.setItem("jwtToken", token);
-        selectedPaciente = null;
-        pacientesById = new Map();
-        pacienteList.innerHTML = "";
-        consultaList.innerHTML = "";
-        usuarioList.innerHTML = "";
-        pacienteSelecionado.textContent = "Selecione um paciente";
-        navConsultas.disabled = true;
-        syncAuthFromToken();
-        updateAuthStatus();
-        applyAccessControl();
-        setView("pacientes");
-        setStatus("Conta criada e login realizado");
-      } catch (error) {
-        setStatus(error.message, true);
-      }
-    });
-  }
-
-  if (legacyLoginForm) {
-    legacyLoginForm.addEventListener("submit", async event => {
-      event.preventDefault();
-      const body = {
-        email: document.getElementById("loginEmail")?.value.trim().toLowerCase() || "",
-        password: document.getElementById("loginPassword")?.value || ""
-      };
-      try {
-        const response = await apiFetch("/api/auth/login", {
-          method: "POST",
-          body: JSON.stringify(body)
-        });
-        token = response.token;
-        localStorage.setItem("jwtToken", token);
-        selectedPaciente = null;
-        pacientesById = new Map();
-        pacienteList.innerHTML = "";
-        consultaList.innerHTML = "";
-        usuarioList.innerHTML = "";
-        pacienteSelecionado.textContent = "Selecione um paciente";
-        navConsultas.disabled = true;
-        syncAuthFromToken();
-        updateAuthStatus();
-        applyAccessControl();
-        setView("pacientes");
-        setStatus("Login realizado");
-      } catch (error) {
-        setStatus(error.message, true);
-      }
-    });
-  }
-}
-
-// Logout do usuario atual.
-const logoutButton = document.getElementById("logout");
-logoutButton.addEventListener("click", () => {
-  token = "";
-  localStorage.removeItem("jwtToken");
-  selectedPaciente = null;
-  navConsultas.disabled = true;
-  syncAuthFromToken();
-  updateAuthStatus();
-  applyAccessControl();
-  setView("auth");
-  setStatus("Logout realizado");
-});
-
-// Cadastro de paciente.
-if (pacienteForm) {
-  pacienteForm.noValidate = true;
-  pacienteForm.addEventListener("submit", async event => {
-    event.preventDefault();
-    const isAdmin = currentRole === "admin";
-    const selectedUserEmail = pacienteUsuarioSelect?.value.trim().toLowerCase() || "";
-    const typedEmail = pacienteEmailInput?.value.trim().toLowerCase() || "";
-    const password = pacientePasswordInput?.value || "";
-    const submitButton = pacienteForm.querySelector("button[type='submit']");
-    let emailToUse = isAdmin ? (selectedUserEmail || typedEmail) : currentEmail;
-
-    if (isAdmin && !emailToUse) {
-      setStatus("Informe um email ou selecione um usuario para vincular", true, 7000);
-      return;
-    }
-
-    const existingUserEmails = new Set(
-      Array.from(pacienteUsuarioSelect?.options || [])
-        .map(option => (option.value || "").trim().toLowerCase())
-        .filter(Boolean)
-    );
-    const isExistingUser = isAdmin ? existingUserEmails.has(emailToUse) : true;
-
-    const nome = document.getElementById("pacienteNome").value.trim();
-    const cpf = onlyDigits(document.getElementById("pacienteCpf").value, 11);
-    const telefone = onlyDigits(document.getElementById("pacienteTelefone").value, 11);
-
-    if (!nome) {
-      setStatus("Informe o nome do paciente", true, 7000);
-      return;
-    }
-    if (cpf.length !== 11) {
-      setStatus("Informe CPF com 11 digitos", true, 7000);
-      return;
-    }
-    if (telefone.length < 10 || telefone.length > 11) {
-      setStatus("Informe telefone com 10 ou 11 digitos", true, 7000);
-      return;
-    }
-    if (!emailToUse || !emailToUse.includes("@")) {
-      setStatus("Informe um email valido", true, 7000);
-      return;
-    }
-
-    if (!isExistingUser && password.trim().length < 6) {
-      setStatus("Para email novo, informe senha com no minimo 6 caracteres", true, 7000);
-      return;
-    }
-
-    if (isAdmin && Array.from(pacientesById.values()).some(p => p.email?.trim().toLowerCase() === emailToUse)) {
-      setStatus("Esse email ja possui paciente vinculado", true, 7000);
-      return;
-    }
-
-    // Envia apenas digitos para CPF/telefone.
-    const body = {
-      nome,
-      cpf,
-      telefone,
-      email: emailToUse,
-      password: isAdmin && !isExistingUser ? password : ""
-    };
-    try {
-      if (submitButton) {
-        submitButton.disabled = true;
-      }
-      await apiFetch("/api/pacientes", {
-        method: "POST",
-        body: JSON.stringify(body)
-      });
-      pacienteForm.reset();
-      if (pacienteEmailInput && !isAdmin) {
-        pacienteEmailInput.value = currentEmail;
-      }
-      if (pacienteEmailInput && isAdmin) {
-        pacienteEmailInput.readOnly = false;
-      }
-      if (isAdmin) {
-        await loadUsuarioOptionsForPaciente();
-      }
-      setStatus("Paciente criado");
-      closeModal("pacienteModal");
-      await loadPacientes();
-    } catch (error) {
-      setStatus(error.message, true, 9000);
-    } finally {
-      if (submitButton) {
-        submitButton.disabled = false;
-      }
-    }
-  });
-}
-
-// Cadastro de consulta.
-if (consultaForm) {
-  consultaForm.noValidate = true;
-  consultaForm.addEventListener("submit", async event => {
-    event.preventDefault();
-    const submitButton = consultaForm.querySelector("button[type='submit']");
-    if (!selectedPaciente) {
-      setStatus("Selecione um paciente primeiro", true, 9000);
-      return;
-    }
-    const selectedOption = consultaHorarioSelect.selectedOptions[0];
-    if (!selectedOption || selectedOption.disabled || !selectedOption.value) {
-      setStatus("Selecione um horario disponivel", true, 9000);
-      return;
-    }
-    const especialidade = consultaEspecialidadeInput?.value.trim() || "";
-    if (!especialidade) {
-      setStatus("Informe a especialidade", true, 9000);
-      return;
-    }
-
-    if (submitButton) {
-      submitButton.disabled = true;
-    }
-
-    const body = {
-      pacienteId: selectedPaciente.id,
-      data: selectedOption.value,
-      especialidade,
-      status: consultaStatusInput?.value.trim() || "agendada"
-    };
-    try {
-      await apiFetch("/api/consultas", {
-        method: "POST",
-        body: JSON.stringify(body)
-      });
-      const dataSelecionada = consultaDataInput.value;
-      consultaForm.reset();
-      if (dataSelecionada) {
-        consultaDataInput.value = dataSelecionada;
-      }
-      setStatus("Consulta criada");
-      closeModal("consultaModal");
-      await loadConsultas();
-      await loadHorarios();
-    } catch (error) {
-      console.error("Falha ao criar consulta:", error);
-      setStatus(`Nao foi possivel criar consulta: ${error.message}`, true, 12000);
-    } finally {
-      if (submitButton) {
-        submitButton.disabled = false;
-      }
-    }
-  });
-}
-
-// Marcacao de consulta para usuario na aba de pacientes.
-if (pacienteConsultaForm) {
-  pacienteConsultaForm.noValidate = true;
-  pacienteConsultaForm.addEventListener("submit", async event => {
-    event.preventDefault();
-    if (currentRole === "admin") {
-      return;
-    }
-    if (!selectedPaciente) {
-      setStatus("Selecione um paciente primeiro", true);
-      return;
-    }
-    const selectedOption = pacienteConsultaHorarioSelect?.selectedOptions?.[0];
-    if (!selectedOption || selectedOption.disabled || !selectedOption.value) {
-      setStatus("Selecione um horario disponivel", true);
-      return;
-    }
-
-    const especialidade = pacienteConsultaEspecialidadeInput?.value.trim() || "";
-    if (!especialidade) {
-      setStatus("Informe a especialidade", true);
-      return;
-    }
-
-    try {
-      await apiFetch("/api/consultas", {
-        method: "POST",
-        body: JSON.stringify({
-          pacienteId: selectedPaciente.id,
-          data: selectedOption.value,
-          especialidade,
-          status: "agendada"
-        })
-      });
-      const dataSelecionada = pacienteConsultaDataInput?.value || "";
-      pacienteConsultaForm.reset();
-      if (pacienteConsultaDataInput && dataSelecionada) {
-        pacienteConsultaDataInput.value = dataSelecionada;
-      }
-      setStatus("Consulta marcada");
-      await loadConsultas();
-      await loadHorariosPacienteUsuario();
-    } catch (error) {
-      setStatus(error.message, true);
-    }
-  });
-}
-
-if (pacienteConsultaForm) {
-  pacienteConsultaForm.addEventListener("click", () => {
-    loadHorariosPacienteUsuario();
-  });
-}
-
-// Atualizacao de role (admin).
-roleForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  const body = {
-    email: roleEmailInput.value.trim().toLowerCase(),
-    role: roleValueInput.value.trim().toLowerCase()
-  };
-  try {
-    await apiFetch("/api/auth/role", {
-      method: "PUT",
-      body: JSON.stringify(body)
-    });
-    roleForm.reset();
-    setStatus("Role atualizado");
-    closeModal("roleModal");
-    await loadUsuarios();
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-});
-
-// Inicializacao da interface com base no token salvo.
-syncAuthFromToken();
-updateAuthStatus();
-applyAccessControl();
+modeLogin.addEventListener("click", () => setAuthMode("login"));
+modeRegister.addEventListener("click", () => setAuthMode("register"));
 setAuthMode("login");
 
-// Define data padrao do agendamento para hoje.
-if (consultaDataInput) {
-  ensureConsultaDateValue();
-  consultaDataInput.addEventListener("change", () => {
-    loadHorarios();
+authForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const dto = { email: authEmail.value.trim(), password: authPassword.value };
+    const endpoint = authMode === "login" ? "/api/auth/login" : "/api/auth/register";
+    const data = await apiFetch(endpoint, { method: "POST", body: JSON.stringify(dto) });
+
+    token = data.token;
+    currentRole = data.role;
+    localStorage.setItem("token", token);
+    localStorage.setItem("role", currentRole);
+
+    updateAuthUI(data);
+    showToast(`Bem-vindo! Logado como ${currentRole}.`, "success");
+    authPassword.value = "";
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+});
+
+function updateAuthUI(data) {
+  const email = data?.email || localStorage.getItem("authEmail") || "";
+  authStatus.textContent = `Logado como ${data?.role || currentRole}`;
+  authUserInfo.textContent = email || "";
+  authUserInfo.hidden = !email;
+
+  if (data?.email) localStorage.setItem("authEmail", data.email);
+
+  // Libera views baseado no role.
+  navConsultas.disabled = false;
+  navPacientes.disabled = false;
+
+  if (currentRole === "admin") {
+    navUsuarios.hidden = false;
+    navConfig.hidden   = false;
+    document.querySelectorAll("[id$='AdminActions']").forEach((el) => (el.hidden = false));
+  } else {
+    navUsuarios.hidden = true;
+    navConfig.hidden   = true;
+  }
+}
+
+document.getElementById("logout").addEventListener("click", () => {
+  token = "";
+  currentRole = "";
+  selectedPacienteId = "";
+  localStorage.removeItem("token");
+  localStorage.removeItem("role");
+  localStorage.removeItem("authEmail");
+
+  authStatus.textContent = "Sem login";
+  authUserInfo.hidden = true;
+  navPacientes.disabled  = true;
+  navConsultas.disabled  = true;
+  navUsuarios.hidden = true;
+  navConfig.hidden   = true;
+  pacienteList.innerHTML = "";
+  consultaList.innerHTML = "";
+  usuarioList.innerHTML  = "";
+
+  document.querySelectorAll("[id$='AdminActions']").forEach((el) => (el.hidden = true));
+  showToast("Sessao encerrada.", "info");
+});
+
+// Restaura sessao salva ao carregar a pagina.
+if (token) {
+  updateAuthUI({ email: localStorage.getItem("authEmail") || "", role: currentRole });
+}
+
+// ─────────────────────────────────────────────────
+// Config da API
+// ─────────────────────────────────────────────────
+apiBaseInput.value = API_BASE;
+
+saveApiBaseButton.addEventListener("click", () => {
+  API_BASE = apiBaseInput.value.trim().replace(/\/$/, "");
+  localStorage.setItem("apiBase", API_BASE);
+  showToast("URL da API salva com sucesso.", "success");
+});
+
+// ─────────────────────────────────────────────────
+// Utilitarios de data / horario
+// ─────────────────────────────────────────────────
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDateTime(isoString) {
+  if (!isoString) return "—";
+  const d = new Date(isoString);
+  if (isNaN(d)) return isoString;
+  return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function formatDateOnly(isoString) {
+  if (!isoString) return "—";
+  const d = new Date(isoString);
+  if (isNaN(d)) return isoString;
+  return d.toLocaleDateString("pt-BR");
+}
+
+// ─────────────────────────────────────────────────
+// Status badge HTML
+// ─────────────────────────────────────────────────
+function statusBadge(status) {
+  const s = (status || "agendada").toLowerCase();
+  const labels = { agendada: "agendada", concluida: "concluída", cancelada: "cancelada" };
+  return `<span class="status-badge status-${s}">${labels[s] || s}</span>`;
+}
+
+// ─────────────────────────────────────────────────
+// Slots de horario
+// ─────────────────────────────────────────────────
+async function loadSlots(dateStr, selectEl) {
+  if (!dateStr) return;
+  try {
+    const slots = await apiFetch(`/api/consultas/slots?date=${dateStr}`);
+    selectEl.innerHTML = "";
+
+    if (!slots || slots.length === 0) {
+      selectEl.innerHTML = '<option value="">Nenhum horario disponivel</option>';
+      return;
+    }
+
+    slots.forEach((slot) => {
+      const opt = document.createElement("option");
+      const d = new Date(slot.data);
+      const hour = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      opt.value = slot.data;
+      opt.textContent = slot.disponivel ? hour : `${hour} (ocupado)`;
+      if (!slot.disponivel) opt.disabled = true;
+      selectEl.appendChild(opt);
+    });
+  } catch (err) {
+    showToast("Erro ao carregar horarios: " + err.message, "error");
+  }
+}
+
+// ─────────────────────────────────────────────────
+// Pacientes
+// ─────────────────────────────────────────────────
+async function loadPacientes() {
+  showLoading("pacienteListLoading");
+  pacienteList.innerHTML = "";
+  try {
+    const pacientes = await apiFetch("/api/pacientes");
+    hideLoading("pacienteListLoading");
+    renderPacientes(pacientes || []);
+  } catch (err) {
+    hideLoading("pacienteListLoading");
+    showToast("Erro ao carregar pacientes: " + err.message, "error");
+  }
+}
+
+function renderPacientes(pacientes) {
+  pacienteList.innerHTML = "";
+
+  if (pacientes.length === 0) {
+    pacienteList.innerHTML = '<li style="color:var(--muted);padding:12px;text-align:center;font-size:14px;">Nenhum paciente cadastrado.</li>';
+    return;
+  }
+
+  pacientes.forEach((p) => {
+    const li = document.createElement("li");
+    const isAdmin = currentRole === "admin";
+
+    li.innerHTML = `
+      <div class="list-item-header">
+        <span class="list-item-title">${p.nome}</span>
+      </div>
+      <div class="list-item-meta">
+        <span>📧 ${p.email}</span>
+        <span>📞 ${p.telefone || "—"}</span>
+      </div>
+      <div class="list-item-actions">
+        <button class="btn-ver" type="button" data-id="${p.id}" data-nome="${p.nome}">Ver consultas</button>
+        ${isAdmin ? `
+          <button class="btn-edit" type="button" data-edit-id="${p.id}" data-edit-nome="${p.nome}" data-edit-cpf="${p.cpf || ""}" data-edit-telefone="${p.telefone || ""}" data-edit-email="${p.email}">Editar</button>
+          <button class="danger" type="button" data-delete-id="${p.id}" data-delete-nome="${p.nome}">Remover</button>
+        ` : ""}
+      </div>
+    `;
+
+    // Ver consultas
+    li.querySelector(".btn-ver").addEventListener("click", (e) => {
+      const id   = e.currentTarget.dataset.id;
+      const nome = e.currentTarget.dataset.nome;
+      selectedPacienteId   = id;
+      selectedPacienteNome = nome;
+      navConsultas.click();
+    });
+
+    // Editar paciente via PATCH
+    if (isAdmin) {
+      li.querySelector(".btn-edit").addEventListener("click", (e) => {
+        const d = e.currentTarget.dataset;
+        document.getElementById("editPacienteId").value        = d.editId;
+        document.getElementById("editPacienteNome").value      = "";
+        document.getElementById("editPacienteCpf").value       = "";
+        document.getElementById("editPacienteTelefone").value  = "";
+        document.getElementById("editPacienteEmail").value     = "";
+        document.getElementById("editPacienteModalTitle").textContent = `Editar: ${d.editNome}`;
+        openModal("editPacienteModal");
+      });
+
+      // Remover paciente
+      li.querySelector(".danger").addEventListener("click", async (e) => {
+        const id   = e.currentTarget.dataset.deleteId;
+        const nome = e.currentTarget.dataset.deleteNome;
+        const ok = await confirmAction(`Remover o paciente "${nome}"? Esta acao nao pode ser desfeita.`, "Remover paciente");
+        if (!ok) return;
+        try {
+          await apiFetch(`/api/pacientes/${id}`, { method: "DELETE" });
+          showToast("Paciente removido.", "success");
+          loadPacientes();
+        } catch (err) {
+          showToast("Erro ao remover: " + err.message, "error");
+        }
+      });
+    }
+
+    pacienteList.appendChild(li);
   });
 }
 
-if (pacienteConsultaDataInput) {
-  const hoje = new Date();
-  const local = new Date(hoje.getTime() - hoje.getTimezoneOffset() * 60000);
-  pacienteConsultaDataInput.value = local.toISOString().slice(0, 10);
-  pacienteConsultaDataInput.addEventListener("change", () => {
-    loadHorariosPacienteUsuario();
+// Modal: novo paciente
+document.getElementById("openPacienteModal").addEventListener("click", async () => {
+  document.getElementById("pacienteForm").reset();
+
+  // Admin pode vincular a usuario existente.
+  if (currentRole === "admin") {
+    pacienteUsuarioGroup.hidden = false;
+    try {
+      const usuarios = await apiFetch("/api/usuarios");
+      pacienteUsuarioSelect.innerHTML = '<option value="">Selecione um usuario cadastrado</option>';
+      (usuarios || []).forEach((u) => {
+        const opt = document.createElement("option");
+        opt.value = u.email;
+        opt.textContent = `${u.email} (${u.role})`;
+        pacienteUsuarioSelect.appendChild(opt);
+      });
+    } catch { /* ignora erro de lista de usuarios */ }
+  }
+
+  openModal("pacienteModal");
+});
+
+// Formulario: criar paciente
+document.getElementById("pacienteForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const emailSelecionado = pacienteUsuarioSelect.value;
+  const dto = {
+    nome:     pacienteCpfInput.closest("form").querySelector("#pacienteNome").value.trim(),
+    cpf:      pacienteCpfInput.value.trim(),
+    telefone: pacienteTelefoneInput.value.trim(),
+    email:    emailSelecionado || pacienteEmailInput.value.trim(),
+    password: pacientePasswordInput.value || undefined,
+  };
+
+  try {
+    await apiFetch("/api/pacientes", { method: "POST", body: JSON.stringify(dto) });
+    closeModal("pacienteModal");
+    showToast("Paciente cadastrado com sucesso!", "success");
+    loadPacientes();
+  } catch (err) {
+    showToast("Erro ao criar paciente: " + err.message, "error");
+  }
+});
+
+// Formulario: editar paciente via PATCH
+document.getElementById("editPacienteForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("editPacienteId").value;
+
+  // Monta dto apenas com campos preenchidos.
+  const dto = {};
+  const nome     = document.getElementById("editPacienteNome").value.trim();
+  const cpf      = document.getElementById("editPacienteCpf").value.trim();
+  const telefone = document.getElementById("editPacienteTelefone").value.trim();
+  const email    = document.getElementById("editPacienteEmail").value.trim();
+
+  if (nome)     dto.nome     = nome;
+  if (cpf)      dto.cpf      = cpf;
+  if (telefone) dto.telefone = telefone;
+  if (email)    dto.email    = email;
+
+  if (Object.keys(dto).length === 0) {
+    showToast("Preencha ao menos um campo para alterar.", "info");
+    return;
+  }
+
+  try {
+    await apiFetch(`/api/pacientes/${id}`, { method: "PATCH", body: JSON.stringify(dto) });
+    closeModal("editPacienteModal");
+    showToast("Paciente atualizado com sucesso!", "success");
+    loadPacientes();
+  } catch (err) {
+    showToast("Erro ao editar paciente: " + err.message, "error");
+  }
+});
+
+// ─────────────────────────────────────────────────
+// Marcar consulta (formulario de paciente)
+// ─────────────────────────────────────────────────
+pacienteConsultaDataInput.addEventListener("change", () => {
+  loadSlots(pacienteConsultaDataInput.value, pacienteConsultaHorarioSelect);
+});
+
+// Inicializa com a data de hoje.
+if (token) {
+  pacienteConsultaDataInput.value = todayISO();
+  pacienteConsultaDataInput.dispatchEvent(new Event("change"));
+}
+
+pacienteConsultaForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!selectedPacienteId) {
+    showToast("Selecione um paciente primeiro.", "info");
+    return;
+  }
+
+  const dto = {
+    pacienteId:   selectedPacienteId,
+    data:         pacienteConsultaHorarioSelect.value,
+    especialidade: pacienteConsultaEspecialidadeInput.value.trim(),
+    status:       "agendada",
+  };
+
+  try {
+    await apiFetch("/api/consultas", { method: "POST", body: JSON.stringify(dto) });
+    showToast("Consulta agendada com sucesso!", "success");
+    pacienteConsultaForm.reset();
+    pacienteConsultaDataInput.value = todayISO();
+    loadSlots(todayISO(), pacienteConsultaHorarioSelect);
+  } catch (err) {
+    showToast("Erro ao agendar: " + err.message, "error");
+  }
+});
+
+// ─────────────────────────────────────────────────
+// Consultas
+// ─────────────────────────────────────────────────
+async function loadConsultas(pacienteId) {
+  showLoading("consultaListLoading");
+  consultaList.innerHTML = "";
+  try {
+    const consultas = pacienteId
+      ? await apiFetch(`/api/consultas/paciente/${pacienteId}`)
+      : await apiFetch("/api/consultas");
+    hideLoading("consultaListLoading");
+    renderConsultas(consultas || []);
+  } catch (err) {
+    hideLoading("consultaListLoading");
+    showToast("Erro ao carregar consultas: " + err.message, "error");
+  }
+}
+
+function renderConsultas(consultas) {
+  consultaList.innerHTML = "";
+
+  if (consultas.length === 0) {
+    consultaList.innerHTML = '<li style="color:var(--muted);padding:12px;text-align:center;font-size:14px;">Nenhuma consulta encontrada.</li>';
+    return;
+  }
+
+  const isAdmin = currentRole === "admin";
+
+  // Ordena por data decrescente.
+  consultas.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+  consultas.forEach((c) => {
+    const li = document.createElement("li");
+    const dataDisplay = c.dataBrasil ? formatDateTime(c.dataBrasil) : formatDateTime(c.data);
+
+    li.innerHTML = `
+      <div class="list-item-header">
+        <span class="list-item-title">${c.especialidade}</span>
+        ${statusBadge(c.status)}
+      </div>
+      <div class="list-item-meta">
+        <span>🕐 ${dataDisplay}</span>
+      </div>
+      ${isAdmin ? `
+        <div class="list-item-actions">
+          <button class="btn-edit" type="button"
+            data-edit-id="${c.id}"
+            data-edit-especialidade="${c.especialidade}"
+            data-edit-status="${c.status}">Editar</button>
+          <button class="danger" type="button"
+            data-delete-id="${c.id}"
+            data-delete-esp="${c.especialidade}">Remover</button>
+        </div>
+      ` : ""}
+    `;
+
+    if (isAdmin) {
+      // Editar consulta via PATCH
+      li.querySelector(".btn-edit").addEventListener("click", (e) => {
+        const d = e.currentTarget.dataset;
+        document.getElementById("editConsultaId").value                = d.editId;
+        document.getElementById("editConsultaDataOpcional").value      = "";
+        document.getElementById("editConsultaEspecialidade").value     = "";
+        document.getElementById("editConsultaStatusSelect").value      = "";
+        document.getElementById("editConsultaHorarioOpcional").innerHTML =
+          '<option value="">-- manter horario atual --</option>';
+        openModal("editConsultaModal");
+      });
+
+      // Remover consulta
+      li.querySelector(".danger").addEventListener("click", async (e) => {
+        const id  = e.currentTarget.dataset.deleteId;
+        const esp = e.currentTarget.dataset.deleteEsp;
+        const ok = await confirmAction(`Remover a consulta de "${esp}"? Esta acao nao pode ser desfeita.`, "Remover consulta");
+        if (!ok) return;
+        try {
+          await apiFetch(`/api/consultas/${id}`, { method: "DELETE" });
+          showToast("Consulta removida.", "success");
+          loadConsultas(selectedPacienteId);
+        } catch (err) {
+          showToast("Erro ao remover: " + err.message, "error");
+        }
+      });
+    }
+
+    consultaList.appendChild(li);
   });
 }
+
+// Modal: nova consulta
+document.getElementById("openConsultaModal").addEventListener("click", () => {
+  document.getElementById("consultaForm").reset();
+  const dataInput    = document.getElementById("consultaData");
+  const horarioSelect = document.getElementById("consultaHorario");
+  dataInput.value = todayISO();
+  loadSlots(todayISO(), horarioSelect);
+  openModal("consultaModal");
+});
+
+document.getElementById("consultaData").addEventListener("change", (e) => {
+  loadSlots(e.target.value, document.getElementById("consultaHorario"));
+});
+
+// Formulario: criar consulta
+document.getElementById("consultaForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!selectedPacienteId) {
+    showToast("Selecione um paciente na aba Pacientes primeiro.", "info");
+    return;
+  }
+
+  const dto = {
+    pacienteId:   selectedPacienteId,
+    data:         document.getElementById("consultaHorario").value,
+    especialidade: document.getElementById("consultaEspecialidade").value.trim(),
+    status:       document.getElementById("consultaStatus").value,
+  };
+
+  try {
+    await apiFetch("/api/consultas", { method: "POST", body: JSON.stringify(dto) });
+    closeModal("consultaModal");
+    showToast("Consulta criada com sucesso!", "success");
+    loadConsultas(selectedPacienteId);
+  } catch (err) {
+    showToast("Erro ao criar consulta: " + err.message, "error");
+  }
+});
+
+// Carrega slots ao mudar data no modal de editar consulta
+document.getElementById("editConsultaDataOpcional").addEventListener("change", (e) => {
+  const select = document.getElementById("editConsultaHorarioOpcional");
+  if (e.target.value) {
+    loadSlots(e.target.value, select);
+  } else {
+    select.innerHTML = '<option value="">-- manter horario atual --</option>';
+  }
+});
+
+// Formulario: editar consulta via PATCH
+document.getElementById("editConsultaForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("editConsultaId").value;
+
+  // Monta dto apenas com campos preenchidos.
+  const dto = {};
+  const horario     = document.getElementById("editConsultaHorarioOpcional").value;
+  const especialidade = document.getElementById("editConsultaEspecialidade").value.trim();
+  const status      = document.getElementById("editConsultaStatusSelect").value;
+
+  if (horario)       dto.data          = horario;
+  if (especialidade) dto.especialidade = especialidade;
+  if (status)        dto.status        = status;
+
+  if (Object.keys(dto).length === 0) {
+    showToast("Preencha ao menos um campo para alterar.", "info");
+    return;
+  }
+
+  try {
+    await apiFetch(`/api/consultas/${id}`, { method: "PATCH", body: JSON.stringify(dto) });
+    closeModal("editConsultaModal");
+    showToast("Consulta atualizada com sucesso!", "success");
+    loadConsultas(selectedPacienteId);
+  } catch (err) {
+    showToast("Erro ao editar consulta: " + err.message, "error");
+  }
+});
+
+// ─────────────────────────────────────────────────
+// Usuarios
+// ─────────────────────────────────────────────────
+async function loadUsuarios() {
+  showLoading("usuarioListLoading");
+  usuarioList.innerHTML = "";
+  try {
+    const usuarios = await apiFetch("/api/usuarios");
+    hideLoading("usuarioListLoading");
+    renderUsuarios(usuarios || []);
+  } catch (err) {
+    hideLoading("usuarioListLoading");
+    showToast("Erro ao carregar usuarios: " + err.message, "error");
+  }
+}
+
+function renderUsuarios(usuarios) {
+  usuarioList.innerHTML = "";
+
+  if (usuarios.length === 0) {
+    usuarioList.innerHTML = '<li style="color:var(--muted);padding:12px;text-align:center;font-size:14px;">Nenhum usuario cadastrado.</li>';
+    return;
+  }
+
+  usuarios.forEach((u) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <div class="list-item-header">
+        <span class="list-item-title">${u.email}</span>
+        <span class="status-badge ${u.role === "admin" ? "status-concluida" : "status-agendada"}">${u.role}</span>
+      </div>
+      <div class="list-item-actions">
+        <button class="danger" type="button" data-delete-id="${u.id}" data-delete-email="${u.email}">Remover</button>
+      </div>
+    `;
+
+    li.querySelector(".danger").addEventListener("click", async (e) => {
+      const id    = e.currentTarget.dataset.deleteId;
+      const email = e.currentTarget.dataset.deleteEmail;
+      const ok = await confirmAction(`Remover o usuario "${email}"?`, "Remover usuario");
+      if (!ok) return;
+      try {
+        await apiFetch(`/api/usuarios/${id}`, { method: "DELETE" });
+        showToast("Usuario removido.", "success");
+        loadUsuarios();
+      } catch (err) {
+        showToast("Erro ao remover: " + err.message, "error");
+      }
+    });
+
+    usuarioList.appendChild(li);
+  });
+}
+
+// ─────────────────────────────────────────────────
+// Modal: atualizar role
+// ─────────────────────────────────────────────────
+document.getElementById("openRoleModal").addEventListener("click", () => {
+  document.getElementById("roleForm").reset();
+  openModal("roleModal");
+});
+
+document.getElementById("roleForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const dto = {
+    email: document.getElementById("roleEmail").value.trim(),
+    role:  document.getElementById("roleValue").value,
+  };
+
+  try {
+    await apiFetch("/api/auth/role", { method: "PUT", body: JSON.stringify(dto) });
+    closeModal("roleModal");
+    showToast(`Role atualizado para "${dto.role}" com sucesso!`, "success");
+    loadUsuarios();
+  } catch (err) {
+    showToast("Erro ao atualizar role: " + err.message, "error");
+  }
+});
+
+// ─────────────────────────────────────────────────
+// Mascara de CPF e telefone
+// ─────────────────────────────────────────────────
+function maskCpf(e) {
+  let v = e.target.value.replace(/\D/g, "").slice(0, 11);
+  if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{3})/, "$1.$2.$3");
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d{3})/, "$1.$2");
+  e.target.value = v;
+}
+
+function maskTelefone(e) {
+  let v = e.target.value.replace(/\D/g, "").slice(0, 11);
+  if (v.length > 10) v = v.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+  else if (v.length > 6) v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+  else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/, "($1) $2");
+  e.target.value = v;
+}
+
+pacienteCpfInput.addEventListener("input", maskCpf);
+pacienteTelefoneInput.addEventListener("input", maskTelefone);
+
+// ─────────────────────────────────────────────────
+// Inicializacao
+// ─────────────────────────────────────────────────
+// Carrega pacientes se ja estiver logado.
+if (token) loadPacientes();

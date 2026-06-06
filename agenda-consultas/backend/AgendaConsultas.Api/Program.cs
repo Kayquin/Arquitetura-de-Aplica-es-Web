@@ -7,6 +7,7 @@ using AgendaConsultas.Api.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 // Bootstrap da API e configuracao do pipeline HTTP.
 var builder = WebApplication.CreateBuilder(args);
@@ -60,10 +61,88 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+});
+
+builder.Services.AddVersionedApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
 builder.Services.AddEndpointsApiExplorer();
-// Swagger usa comentarios XML quando disponiveis.
+// Swagger v1/v2: informacoes da API, seguranca JWT e comentarios XML.
 builder.Services.AddSwaggerGen(options =>
 {
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Agenda Consultas API",
+        Version = "v1",
+        Description = "Versao anterior da API REST para gerenciamento de consultas medicas.",
+        Contact = new OpenApiContact
+        {
+            Name = "Suporte",
+            Email = "suporte@agendaconsultas.com"
+        }
+    });
+
+    options.SwaggerDoc("v2", new OpenApiInfo
+    {
+        Title = "Agenda Consultas API",
+        Version = "v2",
+        Description = "API REST para gerenciamento de consultas medicas. " +
+                      "Suporta autenticacao JWT, CRUD completo de pacientes e consultas, " +
+                      "atualizacao parcial via PATCH e controle de acesso por roles (admin/usuario).",
+        Contact = new OpenApiContact
+        {
+            Name = "Suporte",
+            Email = "suporte@agendaconsultas.com"
+        }
+    });
+
+    options.DocInclusionPredicate((docName, apiDesc) =>
+    {
+        var groupName = apiDesc.GroupName;
+        if (string.IsNullOrWhiteSpace(groupName))
+        {
+            return docName == "v1";
+        }
+
+        return string.Equals(groupName, docName, StringComparison.OrdinalIgnoreCase);
+    });
+
+    // Define o esquema Bearer JWT para autenticacao.
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Informe o token JWT no formato: Bearer {seu_token}"
+    });
+
+    // Aplica o requisito de seguranca globalmente em todos os endpoints.
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+
+    // Inclui comentarios XML dos controllers e DTOs.
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     options.IncludeXmlComments(xmlPath);
@@ -75,9 +154,15 @@ app.UseCors("AllowAll");
 
 if (app.Environment.IsDevelopment())
 {
-    // Swagger apenas em ambiente de desenvolvimento.
+    // Swagger v2 com UI personalizada e rota do endpoint.
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Agenda Consultas API v1");
+        options.SwaggerEndpoint("/swagger/v2/swagger.json", "Agenda Consultas API v2");
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "Agenda Consultas — Swagger UI";
+    });
 }
 
 // Serve o frontend de /frontend quando existir.

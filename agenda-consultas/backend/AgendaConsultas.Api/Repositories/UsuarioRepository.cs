@@ -30,6 +30,40 @@ public class UsuarioRepository : IUsuarioRepository
     public Task CreateAsync(Usuario usuario) =>
         _collection.InsertOneAsync(usuario);
 
+    public Task UpdateAsync(Usuario usuario)
+    {
+        // Atualiza documento completo por id.
+        return _collection.ReplaceOneAsync(u => u.Id == usuario.Id, usuario);
+    }
+
+    public Task PatchAsync(string id, string? email, string? passwordHash, string? role)
+    {
+        var updates = new List<UpdateDefinition<Usuario>>();
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            updates.Add(Builders<Usuario>.Update.Set(u => u.Email, email));
+        }
+
+        if (!string.IsNullOrWhiteSpace(passwordHash))
+        {
+            updates.Add(Builders<Usuario>.Update.Set(u => u.PasswordHash, passwordHash));
+        }
+
+        if (!string.IsNullOrWhiteSpace(role))
+        {
+            updates.Add(Builders<Usuario>.Update.Set(u => u.Role, role));
+        }
+
+        if (updates.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var combined = Builders<Usuario>.Update.Combine(updates);
+        return _collection.UpdateOneAsync(u => u.Id == id, combined);
+    }
+
     public Task UpdateRoleAsync(string email, string role)
     {
         // Atualiza role por email.

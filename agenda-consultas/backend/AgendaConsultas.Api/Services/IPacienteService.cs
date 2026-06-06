@@ -14,8 +14,10 @@ public interface IPacienteService
     Task<Paciente?> GetByEmailAsync(string email);
     // Cria paciente com validacoes.
     Task<Paciente> CreateAsync(PacienteCreateDto dto);
-    // Atualiza paciente por id.
+    // Atualiza paciente por id (substituicao completa).
     Task UpdateAsync(string id, PacienteUpdateDto dto);
+    // Atualiza parcialmente paciente por id (apenas campos informados).
+    Task PatchAsync(string id, PacientePatchDto dto);
     // Remove paciente por id.
     Task DeleteAsync(string id);
 }

@@ -160,6 +160,54 @@ public class ConsultaService : IConsultaService
         await _consultaRepository.UpdateAsync(id, consulta);
     }
 
+    public async Task PatchAsync(string id, ConsultaPatchDto dto)
+    {
+        // Carrega consulta existente para aplicar apenas os campos enviados.
+        var existing = await _consultaRepository.GetByIdAsync(id);
+        if (existing is null)
+        {
+            throw new KeyNotFoundException("Consulta not found");
+        }
+
+        // Aplica apenas os campos presentes no dto.
+        var novaData = existing.Data;
+        if (dto.Data.HasValue)
+        {
+            if (!IsHorarioPadrao(dto.Data.Value))
+            {
+                throw new ArgumentException("Horario invalido. Use horarios padronizados.");
+            }
+
+            novaData = ToUtcFromBrazil(dto.Data.Value);
+        }
+
+        var novaEspecialidade = !string.IsNullOrWhiteSpace(dto.Especialidade)
+            ? dto.Especialidade.Trim()
+            : existing.Especialidade;
+
+        var novoStatus = !string.IsNullOrWhiteSpace(dto.Status)
+            ? NormalizeStatus(dto.Status)
+            : existing.Status;
+
+        // Verifica conflito de horario apenas se a data mudou.
+        if (dto.Data.HasValue && !IsCancelada(novoStatus) && await _consultaRepository.ExistsAtAsync(novaData, existing.Id))
+        {
+            throw new ArgumentException("Horario indisponivel");
+        }
+
+        var atualizada = new Consulta
+        {
+            Id = existing.Id,
+            PacienteId = existing.PacienteId,
+            Data = novaData,
+            DataBrasil = dto.Data.HasValue ? FormatBrazilOffset(dto.Data.Value) : existing.DataBrasil,
+            Especialidade = novaEspecialidade,
+            Status = novoStatus
+        };
+
+        await _consultaRepository.UpdateAsync(id, atualizada);
+    }
+
     public async Task DeleteAsync(string id)
     {
         var existing = await _consultaRepository.GetByIdAsync(id);

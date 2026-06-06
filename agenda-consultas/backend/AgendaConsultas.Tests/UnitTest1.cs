@@ -517,6 +517,42 @@ internal class InMemoryUsuarioRepository : IUsuarioRepository
         return Task.CompletedTask;
     }
 
+    public Task UpdateAsync(Usuario usuario)
+    {
+        var index = _items.FindIndex(u => u.Id == usuario.Id);
+        if (index >= 0)
+        {
+            _items[index] = usuario;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task PatchAsync(string id, string? email, string? passwordHash, string? role)
+    {
+        var user = _items.FirstOrDefault(u => u.Id == id);
+        if (user is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            user.Email = email;
+        }
+
+        if (!string.IsNullOrWhiteSpace(passwordHash))
+        {
+            user.PasswordHash = passwordHash;
+        }
+
+        if (!string.IsNullOrWhiteSpace(role))
+        {
+            user.Role = role;
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task UpdateRoleAsync(string email, string role)
     {
         var user = _items.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));

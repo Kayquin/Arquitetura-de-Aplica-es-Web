@@ -13,6 +13,10 @@ public interface IUsuarioRepository
     Task<Usuario?> GetByEmailAsync(string email);
     // Cria novo usuario.
     Task CreateAsync(Usuario usuario);
+    // Atualiza usuario completo por id.
+    Task UpdateAsync(Usuario usuario);
+    // Atualiza parcialmente usuario por id.
+    Task PatchAsync(string id, string? email, string? passwordHash, string? role);
     // Atualiza apenas a role.
     Task UpdateRoleAsync(string email, string role);
     // Remove usuario por id.

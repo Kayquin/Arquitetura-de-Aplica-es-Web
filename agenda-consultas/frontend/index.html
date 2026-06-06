@@ -9,6 +9,9 @@
 <body>
   <div class="backdrop"></div>
 
+  <!-- Container de toasts (notificacoes flutuantes) -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
   <!-- Hero com contexto do sistema -->
   <header class="hero">
     <div class="hero-copy">
@@ -17,14 +20,16 @@
       <p>Cadastre pacientes, organize consultas e visualize tudo em um painel claro e rapido.</p>
       <div class="hero-note">
         <span>API + MongoDB + JWT</span>
-        <span>CRUD completo</span>
+        <span>CRUD + PATCH</span>
+        <span>Swagger v2</span>
       </div>
     </div>
     <div class="hero-card">
       <h2>Mapa rapido</h2>
       <ul class="hero-list">
-        <li>Autenticacao para liberar o painel.</li>
+        <li>Autenticacao JWT para liberar o painel.</li>
         <li>Pacientes e consultas em paginas separadas.</li>
+        <li>Edicao parcial via PATCH (admin).</li>
         <li>Usuarios e configuracoes somente admin.</li>
       </ul>
     </div>
@@ -41,6 +46,7 @@
 
   <!-- Conteudo principal (views alternadas via JS) -->
   <main class="content">
+
     <!-- View de autenticacao -->
     <section id="view-auth" class="view active">
       <section class="panel auth-panel">
@@ -49,7 +55,6 @@
           <p>Acesse em etapas: escolha a acao e informe seus dados.</p>
         </div>
         <div class="auth-grid">
-          <!-- Fluxo unico para login e registro -->
           <form id="authForm" class="card">
             <h3 id="authFormTitle">Etapa 1: escolha a acao</h3>
             <div class="auth-mode" role="radiogroup" aria-label="Modo de autenticacao">
@@ -62,10 +67,10 @@
             <input id="authPassword" type="password" placeholder="Senha" minlength="6" required />
             <button id="authSubmit" type="submit">Entrar</button>
           </form>
-          <!-- Estado atual do token/login -->
           <div class="card token-box">
             <h3>Status</h3>
             <p id="authStatus">Sem login</p>
+            <div id="authUserInfo" class="user-badge" hidden></div>
             <button id="logout" type="button">Sair</button>
           </div>
         </div>
@@ -80,10 +85,12 @@
             <h2>Pacientes</h2>
             <p>Selecione para ver consultas.</p>
           </div>
+          <div id="pacienteListLoading" class="loading-state" hidden>
+            <div class="spinner"></div><span>Carregando...</span>
+          </div>
           <ul id="pacienteList" class="list"></ul>
         </div>
 
-        <!-- Marcacao de consulta para usuario -->
         <form id="pacienteConsultaForm" class="card form-panel" hidden>
           <h3>Marcar consulta</h3>
           <p id="pacienteConsultaSelecionado" class="hint">Selecione um paciente</p>
@@ -108,6 +115,9 @@
             <h2>Consultas</h2>
             <p id="pacienteSelecionado">Selecione um paciente</p>
           </div>
+          <div id="consultaListLoading" class="loading-state" hidden>
+            <div class="spinner"></div><span>Carregando...</span>
+          </div>
           <ul id="consultaList" class="list"></ul>
         </div>
         <div id="consultaAdminActions" class="card form-panel" hidden>
@@ -124,6 +134,9 @@
           <div class="panel-header">
             <h2>Usuarios</h2>
             <p>Somente admin pode listar ou remover.</p>
+          </div>
+          <div id="usuarioListLoading" class="loading-state" hidden>
+            <div class="spinner"></div><span>Carregando...</span>
           </div>
           <ul id="usuarioList" class="list"></ul>
         </div>
@@ -157,7 +170,7 @@
       </div>
     </section>
 
-    <!-- Modal de paciente (admin) -->
+    <!-- Modal: novo paciente (admin) -->
     <div id="pacienteModal" class="modal" hidden>
       <div class="modal-backdrop" data-close-modal="pacienteModal"></div>
       <div class="modal-dialog card" role="dialog" aria-modal="true" aria-labelledby="pacienteModalTitle">
@@ -182,7 +195,27 @@
       </div>
     </div>
 
-    <!-- Modal de consulta (admin) -->
+    <!-- Modal: editar paciente via PATCH (admin) -->
+    <div id="editPacienteModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-modal="editPacienteModal"></div>
+      <div class="modal-dialog card" role="dialog" aria-modal="true" aria-labelledby="editPacienteModalTitle">
+        <div class="modal-header">
+          <h3 id="editPacienteModalTitle">Editar paciente</h3>
+          <button type="button" class="modal-close" data-close-modal="editPacienteModal">Fechar</button>
+        </div>
+        <p class="hint modal-hint">Preencha apenas os campos que deseja alterar.</p>
+        <form id="editPacienteForm">
+          <input id="editPacienteId" type="hidden" />
+          <input id="editPacienteNome" type="text" placeholder="Nome completo (opcional)" />
+          <input id="editPacienteCpf" type="text" placeholder="CPF (opcional)" />
+          <input id="editPacienteTelefone" type="text" placeholder="Telefone (opcional)" />
+          <input id="editPacienteEmail" type="email" placeholder="Email (opcional)" />
+          <button type="submit">Salvar alterações</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: nova consulta (admin) -->
     <div id="consultaModal" class="modal" hidden>
       <div class="modal-backdrop" data-close-modal="consultaModal"></div>
       <div class="modal-dialog card" role="dialog" aria-modal="true" aria-labelledby="consultaModalTitle">
@@ -204,7 +237,37 @@
       </div>
     </div>
 
-    <!-- Modal de role (admin) -->
+    <!-- Modal: editar consulta via PATCH (admin) -->
+    <div id="editConsultaModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close-modal="editConsultaModal"></div>
+      <div class="modal-dialog card" role="dialog" aria-modal="true" aria-labelledby="editConsultaModalTitle">
+        <div class="modal-header">
+          <h3 id="editConsultaModalTitle">Editar consulta</h3>
+          <button type="button" class="modal-close" data-close-modal="editConsultaModal">Fechar</button>
+        </div>
+        <p class="hint modal-hint">Preencha apenas os campos que deseja alterar.</p>
+        <form id="editConsultaForm">
+          <input id="editConsultaId" type="hidden" />
+          <label class="field-label" for="editConsultaDataOpcional">Data (opcional)</label>
+          <input id="editConsultaDataOpcional" type="date" />
+          <label class="field-label" for="editConsultaHorarioOpcional">Horario (opcional)</label>
+          <select id="editConsultaHorarioOpcional">
+            <option value="">-- manter horario atual --</option>
+          </select>
+          <input id="editConsultaEspecialidade" type="text" placeholder="Especialidade (opcional)" />
+          <label class="field-label" for="editConsultaStatusSelect">Status</label>
+          <select id="editConsultaStatusSelect">
+            <option value="">-- manter status atual --</option>
+            <option value="agendada">agendada</option>
+            <option value="concluida">concluida</option>
+            <option value="cancelada">cancelada</option>
+          </select>
+          <button type="submit">Salvar alterações</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: atualizar role (admin) -->
     <div id="roleModal" class="modal" hidden>
       <div class="modal-backdrop" data-close-modal="roleModal"></div>
       <div class="modal-dialog card" role="dialog" aria-modal="true" aria-labelledby="roleModalTitle">
@@ -222,6 +285,20 @@
         </form>
       </div>
     </div>
+
+    <!-- Dialogo de confirmacao reutilizavel -->
+    <div id="confirmModal" class="modal" hidden>
+      <div class="modal-backdrop"></div>
+      <div class="modal-dialog card confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <h3 id="confirmTitle">Confirmar acao</h3>
+        <p id="confirmMessage"></p>
+        <div class="confirm-actions">
+          <button id="confirmCancel" type="button" class="btn-secondary">Cancelar</button>
+          <button id="confirmOk" type="button" class="danger">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <footer class="footer">

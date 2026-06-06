@@ -6,28 +6,25 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
-namespace AgendaConsultas.Api.Controllers;
+namespace AgendaConsultas.Api.Controllers.V2;
 
-// CRUD de pacientes com protecao por JWT.
+// CRUD de pacientes com protecao por JWT (v2).
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("2.0")]
 [Route("api/v{version:apiVersion}/pacientes")]
 [Authorize]
-[ApiExplorerSettings(GroupName = "v1")]
-public class PacientesController : ControllerBase
+[ApiExplorerSettings(GroupName = "v2")]
+public class PacientesV2Controller : ControllerBase
 {
     private readonly IPacienteService _service;
     private readonly IUsuarioRepository _usuarioRepository;
 
-    public PacientesController(IPacienteService service, IUsuarioRepository usuarioRepository)
+    public PacientesV2Controller(IPacienteService service, IUsuarioRepository usuarioRepository)
     {
         _service = service;
         _usuarioRepository = usuarioRepository;
     }
 
-    /// <summary>
-    /// Lista todos os pacientes.
-    /// </summary>
     [HttpGet]
     public async Task<ActionResult<List<Paciente>>> GetAll()
     {
@@ -47,15 +44,11 @@ public class PacientesController : ControllerBase
         return Ok(pacientes);
     }
 
-    /// <summary>
-    /// Busca um paciente pelo id.
-    /// </summary>
     [HttpGet("{id}")]
     public async Task<ActionResult<Paciente>> GetById(string id)
     {
         try
         {
-            // Service trata id inexistente.
             var paciente = await _service.GetByIdAsync(id);
 
             if (!User.IsInRole("admin"))
@@ -80,18 +73,6 @@ public class PacientesController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Cria um novo paciente.
-    /// </summary>
-    /// <remarks>
-    /// Exemplo:
-    /// {
-    ///   "nome": "Ana Silva",
-    ///   "cpf": "12345678901",
-    ///   "telefone": "11999999999",
-    ///   "email": "ana@email.com"
-    /// }
-    /// </remarks>
     [HttpPost]
     public async Task<ActionResult<Paciente>> Create(PacienteCreateDto dto)
     {
@@ -105,7 +86,6 @@ public class PacientesController : ControllerBase
                     return Unauthorized();
                 }
 
-                // Usuario comum sempre cria/associa paciente ao proprio email.
                 dto.Email = email;
             }
             else
@@ -130,7 +110,6 @@ public class PacientesController : ControllerBase
                 dto.Email = email;
             }
 
-            // Valida e cria paciente.
             var paciente = await _service.CreateAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id = paciente.Id }, paciente);
         }
@@ -140,16 +119,12 @@ public class PacientesController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Atualiza um paciente por id (admin).
-    /// </summary>
     [Authorize(Roles = "admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, PacienteUpdateDto dto)
     {
         try
         {
-            // Atualizacao restrita a admin.
             await _service.UpdateAsync(id, dto);
             return NoContent();
         }
@@ -163,22 +138,12 @@ public class PacientesController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Atualiza parcialmente um paciente por id (admin).
-    /// </summary>
-    /// <remarks>
-    /// Envie apenas os campos que deseja alterar. Exemplo:
-    /// {
-    ///   "telefone": "11988887777"
-    /// }
-    /// </remarks>
     [Authorize(Roles = "admin")]
     [HttpPatch("{id}")]
     public async Task<IActionResult> Patch(string id, PacientePatchDto dto)
     {
         try
         {
-            // Atualizacao parcial restrita a admin.
             await _service.PatchAsync(id, dto);
             return NoContent();
         }
@@ -192,16 +157,12 @@ public class PacientesController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Remove um paciente por id (admin).
-    /// </summary>
     [Authorize(Roles = "admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)
     {
         try
         {
-            // Remocao restrita a admin.
             await _service.DeleteAsync(id);
             return NoContent();
         }

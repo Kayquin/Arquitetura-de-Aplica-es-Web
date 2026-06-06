@@ -93,6 +93,52 @@ public class PacienteService : IPacienteService
         await _repository.UpdateAsync(id, paciente);
     }
 
+    public async Task PatchAsync(string id, PacientePatchDto dto)
+    {
+        // Carrega paciente existente para aplicar apenas os campos enviados.
+        var existing = await _repository.GetByIdAsync(id);
+        if (existing is null)
+        {
+            throw new KeyNotFoundException("Paciente not found");
+        }
+
+        // Aplica apenas os campos presentes no dto.
+        var novoNome = !string.IsNullOrWhiteSpace(dto.Nome) ? dto.Nome.Trim() : existing.Nome;
+        var novoCpf = !string.IsNullOrWhiteSpace(dto.Cpf) ? dto.Cpf.Trim() : existing.Cpf;
+        var novoTelefone = !string.IsNullOrWhiteSpace(dto.Telefone) ? dto.Telefone.Trim() : existing.Telefone;
+
+        var novoEmail = existing.Email;
+        if (!string.IsNullOrWhiteSpace(dto.Email))
+        {
+            novoEmail = dto.Email.Trim().ToLowerInvariant();
+            if (!novoEmail.Contains('@'))
+            {
+                throw new ArgumentException("Email is invalid");
+            }
+
+            // Verifica unicidade de email apenas se mudou.
+            if (!string.Equals(novoEmail, existing.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                await ValidateUsuarioVinculadoAsync(novoEmail);
+                if (await _repository.EmailExistsAsync(novoEmail))
+                {
+                    throw new ArgumentException("Email already registered");
+                }
+            }
+        }
+
+        var atualizado = new Paciente
+        {
+            Id = existing.Id,
+            Nome = novoNome,
+            Cpf = novoCpf,
+            Telefone = novoTelefone,
+            Email = novoEmail
+        };
+
+        await _repository.UpdateAsync(id, atualizado);
+    }
+
     public async Task DeleteAsync(string id)
     {
         // Bloqueia delete quando o id nao existe.

@@ -7,8 +7,10 @@ namespace AgendaConsultas.Api.Controllers;
 
 // Endpoints administrativos para listar/remover usuarios.
 [ApiController]
-[Route("api/usuarios")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/usuarios")]
 [Authorize(Roles = "admin")]
+[ApiExplorerSettings(GroupName = "v1")]
 public class UsuariosController : ControllerBase
 {
     private readonly IUsuarioService _service;

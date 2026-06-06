@@ -3,42 +3,27 @@ using AgendaConsultas.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AgendaConsultas.Api.Controllers;
+namespace AgendaConsultas.Api.Controllers.V2;
 
-// Endpoints de autenticacao e gerenciamento de roles.
+// Endpoints de autenticacao e gerenciamento de roles (v2).
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("2.0")]
 [Route("api/v{version:apiVersion}/auth")]
-[ApiExplorerSettings(GroupName = "v1")]
-public class AuthController : ControllerBase
+[ApiExplorerSettings(GroupName = "v2")]
+public class AuthV2Controller : ControllerBase
 {
     private readonly IAuthService _authService;
 
-    public AuthController(IAuthService authService)
+    public AuthV2Controller(IAuthService authService)
     {
         _authService = authService;
     }
 
-    /// <summary>
-    /// Registra um novo usuario e retorna o token JWT.
-    /// </summary>
-    /// <remarks>
-    /// Exemplo:
-    /// {
-    ///   "email": "usuario@email.com",
-    ///   "password": "123456",
-    ///   "role": "usuario",
-    ///   "nome": "Ana Silva",
-    ///   "cpf": "12345678901",
-    ///   "telefone": "11999999999"
-    /// }
-    /// </remarks>
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponseDto>> Register(AuthRegisterDto dto)
     {
         try
         {
-            // Delegado para o service que valida e cria o usuario.
             var response = await _authService.RegisterAsync(dto);
             return Ok(response);
         }
@@ -48,22 +33,11 @@ public class AuthController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Autentica um usuario e retorna o token JWT.
-    /// </summary>
-    /// <remarks>
-    /// Exemplo:
-    /// {
-    ///   "email": "admin@email.com",
-    ///   "password": "123456"
-    /// }
-    /// </remarks>
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponseDto>> Login(AuthLoginDto dto)
     {
         try
         {
-            // Service valida credenciais e emite JWT.
             var response = await _authService.LoginAsync(dto);
             return Ok(response);
         }
@@ -73,23 +47,12 @@ public class AuthController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Atualiza o role de um usuario (admin).
-    /// </summary>
-    /// <remarks>
-    /// Exemplo:
-    /// {
-    ///   "email": "usuario@email.com",
-    ///   "role": "admin"
-    /// }
-    /// </remarks>
     [Authorize(Roles = "admin")]
     [HttpPut("role")]
     public async Task<ActionResult<AuthRoleUpdateResponseDto>> UpdateRole(AuthRoleUpdateDto dto)
     {
         try
         {
-            // Apenas admin pode alterar role de outros usuarios.
             var response = await _authService.UpdateRoleAsync(dto);
             return Ok(response);
         }
